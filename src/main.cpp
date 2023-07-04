@@ -1,15 +1,20 @@
 #include <Arduino.h>
-#include <QuadEncoder.h>
+#include <EncoderMotor.h>
 
-unsigned long elapsedTime;
-
+unsigned int loopTime;
 // PWM setup globals
 byte pwmChannel1 = 0;
 byte pwmChannel2 = 1;
-unsigned int pwmFreq = 500;
+unsigned int pwmFreq = 50;
 byte pwmRes = 10;
 unsigned int pwmMax = pow(2,pwmRes) - 1;
-unsigned int pwmMin = pwmMax * 0.25;
+unsigned int pwmMin = pwmMax / 8;
+
+// Motor object controls
+int pwr1 = 0;
+int pwr2 = 0;
+byte dir1 = 0;
+byte dir2 = 0;
 
 // Motor and driver pins
 byte enA = 14;
@@ -20,8 +25,8 @@ byte in4 = 33;
 byte enB = 32;
 
 // create encoder objects
-QuadEncoder e1(35,34);
-QuadEncoder e2(39,36);
+EncoderMotor e1(35,34);
+EncoderMotor e2(39,36);
 byte interruptArray[4] = {e1.encAFlag,e1.encBFlag,e2.encAFlag,e2.encBFlag};
 
 // ISR
@@ -68,26 +73,25 @@ void setup() {
   // set motors to idle
   driveMotor(pwmChannel1, 0, 0, in1, in2);
   driveMotor(pwmChannel2, 0, 0, in3, in4);
+
+  delay(1000);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  elapsedTime = esp_timer_get_time() / 1000000; // time in milliseconds
-  
-  int pwr1, pwr2;
-  byte dir1, dir2;
+  loopTime = (esp_timer_get_time() / 1000000) % 8; // time in milliseconds (resets every 8 seconds)
 
   // cycle through movements
-  if (elapsedTime % 8 == 0) {
+  if (loopTime == 0) {
     pwr1 = pwmMax;
     dir1 = 1;
-  } else if (elapsedTime % 8 == 2) {
+  } else if (loopTime == 2) {
     pwr2 = pwmMax;
     dir2 = 1;
-  } else if (elapsedTime % 8 == 4) {
+  } else if (loopTime == 4) {
     pwr1 = pwmMin;
     dir1 = 0;
-  } else if (elapsedTime % 8 == 6) {
+  } else if (loopTime == 6) {
     pwr2 = pwmMin;
     dir2 = 0;
   }
@@ -96,17 +100,19 @@ void loop() {
   driveMotor(pwmChannel2, pwr2, dir2, in3, in4);
 
   // read encoders and update position
-  e1.updatePos(digitalRead(e1.encA), digitalRead(e1.encB));
-  e2.updatePos(digitalRead(e1.encA), digitalRead(e2.encB));
+  e1.updatePosition(digitalRead(e1.encA), digitalRead(e1.encB));
+  e2.updatePosition(digitalRead(e1.encA), digitalRead(e2.encB));
 
   // print data
-  Serial.print("M1 pwm: ");
+  Serial.print("Time: ");
+  Serial.print(loopTime);
+  Serial.print(", M1 pwm: ");
   Serial.print(pwr1);
   Serial.print(", dir: ");
   Serial.print(dir1);
   Serial.print(", pos: ");
   Serial.print(e1.position);
-  Serial.print(" | M2 pwm: ");
+  Serial.print(", M2 pwm: ");
   Serial.print(pwr2);
   Serial.print(", dir: ");
   Serial.print(dir2);
