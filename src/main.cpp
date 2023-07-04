@@ -6,7 +6,7 @@ unsigned int loopTime;
 // PWM Globals
 unsigned int pwmMinimumFreq = 50;
 unsigned int pwmMaximumFreq = 500;
-unsigned int DynamicFreqPowerThreshold = 0.5;
+float DynamicFreqPowerThreshold = 0.5;
 byte pwmResolution = 10;
 
 // create encoder motor objects and map ISR array
