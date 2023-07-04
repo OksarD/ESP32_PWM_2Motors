@@ -1,13 +1,56 @@
 #include "EncoderMotor.h"
 
-// Constructor
-EncoderMotor::EncoderMotor(byte encA_pin, byte encB_pin) {
+
+// Configure Pin Modes
+void EncoderMotor::configurePins(byte encA_pin, byte encB_pin, byte enable_pin, byte in1_pin, byte in2_pin) {
     encA = encA_pin;
     encB = encB_pin;
+    enable = enable_pin;
+    in1 = in1_pin;
+    in2 = in2_pin;
+    pinMode(encA, INPUT);
+    pinMode(encB, INPUT);
+    pinMode(in1, OUTPUT);
+    pinMode(in2, OUTPUT);
+}
+    
+// Configure ESP32 PWM and Dynamic Frequency Bounds
+void EncoderMotor::configurePWM(unsigned int pwmFreq_min, unsigned int pwmFreq_max, float power_threshold, byte pwm_channel, byte pwm_resolution) {
+    pwmFreqMin = pwmFreq_min;
+    pwmFreqMax = pwmFreq_max;
+    resolution = pwm_resolution;
+    maxPower = pow(2,resolution) - 1;
+    threshold = power_threshold * maxPower;
+    channel = pwm_channel;
+    frequency = pwmFreqMax;
+    prevFrequency = pwmFreqMax;
+    stepHeight = (pwmFreqMax - pwmFreqMin) / freqSteps;
+    ledcAttachPin(enable, channel);
+    ledcSetup(channel, frequency, resolution);
+}
+
+// Update Power-Dependent Dynamic Frequency
+void EncoderMotor::updateFreq(unsigned int pwr) {
+    if (pwr < threshold) {
+        frequency = stepFunction(pwr);
+    } else {
+        frequency = pwmFreqMax;
+    }
+    if (prevFrequency != frequency) {
+        ledcChangeFrequency(channel, frequency, resolution);
+    }
+    prevFrequency = frequency;
+}
+
+// Compute Stepped Linear Frequency Function
+unsigned int EncoderMotor::stepFunction(unsigned int x) {
+    return (floor(((pwmFreqMax - pwmFreqMin) * x) / (threshold * stepHeight)) * stepHeight) + pwmFreqMin;
 }
 
 // Update and Read Encoder States
-void EncoderMotor::updatePosition(byte encA_read, byte encB_read) {
+void EncoderMotor::updatePosition() {
+    byte encA_read = digitalRead(encA);
+    byte encB_read = digitalRead(encB);
     if (encAFlag == 1) {
         if (encA_read != encB_read) {
             position ++;
@@ -21,4 +64,51 @@ void EncoderMotor::updatePosition(byte encA_read, byte encB_read) {
             position ++;
         }
     }
+}
+
+// Drive Motor using PWM and Direction controls
+void EncoderMotor::driveMotor(unsigned int pwr, byte dir) {
+    power = pwr;
+    direction = dir;
+    updateFreq(power);
+    ledcWrite(channel, power);
+    if (direction == 1) {
+        digitalWrite(in1, HIGH);
+        digitalWrite(in2, LOW);
+    } else {
+        digitalWrite(in2, HIGH);
+        digitalWrite(in1, LOW);
+    }
+}
+
+void EncoderMotor::driveMotor() {
+    updateFreq(power);
+    ledcWrite(channel, power);
+    if (direction == 1) {
+        digitalWrite(in1, HIGH);
+        digitalWrite(in2, LOW);
+    } else {
+        digitalWrite(in2, HIGH);
+        digitalWrite(in1, LOW);
+    }
+}
+
+void EncoderMotor::stopMotor() {
+    power = 0;
+    updateFreq(power);
+    ledcWrite(channel, 0);
+    digitalWrite(in1, LOW);
+    digitalWrite(in2, LOW);
+}
+
+void EncoderMotor::setPower(unsigned int pwr) {
+    power = pwr;
+}
+
+void EncoderMotor::setDirection(byte dir) {
+    direction = dir;
+}
+
+unsigned int EncoderMotor::getMaxPower() {
+    return maxPower;
 }
