@@ -21,8 +21,7 @@ void EncoderMotor::configurePWM(unsigned int pwmFreq_min, unsigned int pwmFreq_m
     resolution = pwm_resolution;
     maxPower = pow(2,resolution) - 1;
     threshold = power_threshold * maxPower;
-    stepWidth = (threshold / freqSteps);
-    powerBuffer = stepWidth * 0.5;
+    powerBuffer = (0.25 * threshold) / freqSteps;
     channel = pwm_channel;
     frequency = pwmFreqMax;
     prevFrequency = pwmFreqMax;
@@ -33,8 +32,8 @@ void EncoderMotor::configurePWM(unsigned int pwmFreq_min, unsigned int pwmFreq_m
 
 // Update Power-Dependent Dynamic Frequency
 void EncoderMotor::updateFreq() {
-    static int lowBuffer = - powerBuffer;
-    static int highBuffer = stepWidth;
+    static int lowBuffer = -powerBuffer;
+    static int highBuffer = powerBuffer;
     if (power < threshold) {
         if (!(power > lowBuffer && power < highBuffer)) {
             frequency = stepFunction(power);
@@ -43,12 +42,12 @@ void EncoderMotor::updateFreq() {
         frequency = pwmFreqMax;
     }
     if (prevFrequency < frequency) { //frequency just decreased
-        highBuffer = frequency + powerBuffer;
-        lowBuffer = frequency - stepWidth;
+        highBuffer = power + powerBuffer;
+        lowBuffer = power - powerBuffer;
         ledcChangeFrequency(channel, frequency, resolution);
     }   else if (prevFrequency > frequency) { //frequency just increased
-        lowBuffer = frequency - powerBuffer;
-        highBuffer = frequency + stepWidth;
+        lowBuffer = power - powerBuffer;
+        highBuffer = power + powerBuffer;
         ledcChangeFrequency(channel, frequency, resolution);
     }
     prevFrequency = frequency;

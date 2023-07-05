@@ -66,7 +66,6 @@ void loop() {
   */
 
   unsigned int sawtooth = (loopTime * (m1.getMaxPower() - 50) / 8000) + 15;
-  unsigned int wave = (30 * sin(float(loopTime) / float(100))) + 15;
   unsigned int wavysaw = (30 * sin(float(loopTime) / float(100))) + (loopTime * (m1.getMaxPower() - 50) / 8000) + 15;
   m1.setPower(sawtooth);
   m1.setDirection(0);
