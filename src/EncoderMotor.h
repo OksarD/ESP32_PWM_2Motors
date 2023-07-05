@@ -6,7 +6,7 @@
 class EncoderMotor {
 public:
     void configurePins(byte encA_pin, byte encB_pin, byte enable_pin, byte in1_pin, byte in2_pin);
-    void configurePWM(unsigned int pwmFreq_min, unsigned int pwmFreq_max, float power_threshold, byte pwm_channel, byte pwm_resolution);
+    void configurePWM(unsigned int pwmFreq_min, unsigned int pwmFreq_max, float power_threshold, byte freq_steps, byte pwm_channel, byte pwm_resolution);
 
     void driveMotor(unsigned int pwr, byte dir);
     void driveMotor();
@@ -25,7 +25,7 @@ public:
 
     byte channel;
     byte resolution;
-    unsigned int freqSteps = 5;
+    byte freqSteps;
     
     unsigned int power = 0;
     byte direction = 0;

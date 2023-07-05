@@ -15,16 +15,17 @@ void EncoderMotor::configurePins(byte encA_pin, byte encB_pin, byte enable_pin, 
 }
     
 // Configure ESP32 PWM and Dynamic Frequency Bounds
-void EncoderMotor::configurePWM(unsigned int pwmFreq_min, unsigned int pwmFreq_max, float power_threshold, byte pwm_channel, byte pwm_resolution) {
+void EncoderMotor::configurePWM(unsigned int pwmFreq_min, unsigned int pwmFreq_max, float power_threshold, byte freq_steps, byte pwm_channel, byte pwm_resolution) {
     pwmFreqMin = pwmFreq_min;
     pwmFreqMax = pwmFreq_max;
     resolution = pwm_resolution;
+    freqSteps = freq_steps;
+    channel = pwm_channel;
     maxPower = pow(2,resolution) - 1;
     threshold = power_threshold * maxPower;
     powerBuffer = (0.25 * threshold) / freqSteps;
     lowBuffer = -powerBuffer;
     highBuffer = powerBuffer;
-    channel = pwm_channel;
     frequency = pwmFreqMax;
     prevFrequency = pwmFreqMax;
     stepHeight = (pwmFreqMax - pwmFreqMin) / freqSteps;
