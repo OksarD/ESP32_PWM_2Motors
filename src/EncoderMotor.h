@@ -46,6 +46,8 @@ private:
     unsigned int threshold;
     unsigned int prevFrequency;
     unsigned int powerBuffer;
+    int lowBuffer;
+    int highBuffer;
 };
 
 #endif //ENCODERMOTOR_H
