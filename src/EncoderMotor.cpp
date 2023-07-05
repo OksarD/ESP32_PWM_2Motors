@@ -21,6 +21,8 @@ void EncoderMotor::configurePWM(unsigned int pwmFreq_min, unsigned int pwmFreq_m
     resolution = pwm_resolution;
     maxPower = pow(2,resolution) - 1;
     threshold = power_threshold * maxPower;
+    stepWidth = (threshold / freqSteps);
+    powerBuffer = stepWidth * 0.5;
     channel = pwm_channel;
     frequency = pwmFreqMax;
     prevFrequency = pwmFreqMax;
@@ -30,13 +32,23 @@ void EncoderMotor::configurePWM(unsigned int pwmFreq_min, unsigned int pwmFreq_m
 }
 
 // Update Power-Dependent Dynamic Frequency
-void EncoderMotor::updateFreq(unsigned int pwr) {
-    if (pwr < threshold) {
-        frequency = stepFunction(pwr);
+void EncoderMotor::updateFreq() {
+    static int lowBuffer = - powerBuffer;
+    static int highBuffer = stepWidth;
+    if (power < threshold) {
+        if (!(power > lowBuffer && power < highBuffer)) {
+            frequency = stepFunction(power);
+        }
     } else {
         frequency = pwmFreqMax;
     }
-    if (prevFrequency != frequency) {
+    if (prevFrequency < frequency) { //frequency just decreased
+        highBuffer = frequency + powerBuffer;
+        lowBuffer = frequency - stepWidth;
+        ledcChangeFrequency(channel, frequency, resolution);
+    }   else if (prevFrequency > frequency) { //frequency just increased
+        lowBuffer = frequency - powerBuffer;
+        highBuffer = frequency + stepWidth;
         ledcChangeFrequency(channel, frequency, resolution);
     }
     prevFrequency = frequency;
@@ -70,7 +82,7 @@ void EncoderMotor::updatePosition() {
 void EncoderMotor::driveMotor(unsigned int pwr, byte dir) {
     power = pwr;
     direction = dir;
-    updateFreq(power);
+    updateFreq();
     ledcWrite(channel, power);
     if (direction == 1) {
         digitalWrite(in1, HIGH);
@@ -82,7 +94,7 @@ void EncoderMotor::driveMotor(unsigned int pwr, byte dir) {
 }
 
 void EncoderMotor::driveMotor() {
-    updateFreq(power);
+    updateFreq();
     ledcWrite(channel, power);
     if (direction == 1) {
         digitalWrite(in1, HIGH);
@@ -95,7 +107,7 @@ void EncoderMotor::driveMotor() {
 
 void EncoderMotor::stopMotor() {
     power = 0;
-    updateFreq(power);
+    updateFreq();
     ledcWrite(channel, 0);
     digitalWrite(in1, LOW);
     digitalWrite(in2, LOW);

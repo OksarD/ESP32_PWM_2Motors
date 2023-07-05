@@ -35,17 +35,18 @@ public:
     byte encAFlag = 0;
     byte encBFlag = 0;
 private:
-    void updateFreq(unsigned int pwr);
+    void updateFreq();
     unsigned int stepFunction(unsigned int x);
 
     unsigned int maxPower;
-    unsigned int prevPower;
+    unsigned int prevPower = 0;
     unsigned int stepHeight;
     unsigned int pwmFreqMin;
     unsigned int pwmFreqMax;
     unsigned int threshold;
     unsigned int prevFrequency;
-    unsigned int stepOffset;
+    unsigned int powerBuffer;
+    unsigned int stepWidth;
 };
 
 #endif //ENCODERMOTOR_H

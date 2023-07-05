@@ -2,6 +2,7 @@
 #include <EncoderMotor.h>
 
 unsigned int loopTime;
+unsigned long elapsedTime;
 
 // PWM Globals
 unsigned int pwmMinimumFreq = 50;
@@ -44,23 +45,34 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  loopTime = (esp_timer_get_time() / 1000000) % 8; // time in seconds (resets every 8 seconds)
+  elapsedTime = esp_timer_get_time();
+  loopTime = (elapsedTime / 1000) % 8000; // time in milliseconds (resets every 8 seconds)
 
   // cycle through movements
+  /*
   if (loopTime == 0) {
     m1.setPower(m1.getMaxPower() * 0.5);
     m1.setDirection(1);
-  } else if (loopTime == 2) {
+  } else if (loopTime == 2000) {
     m2.setPower(m2.getMaxPower() * 0.4);
     m2.setDirection(1);
-  } else if (loopTime == 4) {
+  } else if (loopTime == 4000) {
     m1.setPower(m1.getMaxPower() * 0.3);
     m1.setDirection(0);
-  } else if (loopTime == 6) {
+  } else if (loopTime == 6000) {
     m2.setPower(m2.getMaxPower() * 0.2);
     m2.setDirection(0);
   }
-  
+  */
+
+  unsigned int sawtooth = (loopTime * (m1.getMaxPower() - 50) / 8000) + 15;
+  unsigned int wave = (30 * sin(float(loopTime) / float(100))) + 15;
+  unsigned int wavysaw = (30 * sin(float(loopTime) / float(100))) + (loopTime * (m1.getMaxPower() - 50) / 8000) + 15;
+  m1.setPower(sawtooth);
+  m1.setDirection(0);
+  m2.setPower(wavysaw);
+  m2.setDirection(1);
+
   // drive motors
   m1.driveMotor();
   m2.driveMotor();
