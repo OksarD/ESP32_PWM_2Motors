@@ -22,10 +22,6 @@ public:
     byte enable;
     byte in1;
     byte in2;
-
-    byte channel;
-    byte resolution;
-    byte freqSteps;
     
     unsigned int power = 0;
     byte direction = 0;
@@ -38,7 +34,11 @@ private:
     void updateFreq();
     unsigned int stepFunction(unsigned int x);
 
+    byte channel;
+    byte resolution;
+    byte freqSteps;
     unsigned int maxPower;
+
     unsigned int prevPower = 0;
     unsigned int stepHeight;
     unsigned int pwmFreqMin;
@@ -46,8 +46,8 @@ private:
     unsigned int threshold;
     unsigned int prevFrequency;
     unsigned int powerBuffer;
-    int lowBuffer;
-    int highBuffer;
+    int lowBufferEdge;
+    int highBufferEdge;
 };
 
 #endif //ENCODERMOTOR_H
