@@ -59,20 +59,23 @@ unsigned int EncoderMotor::stepFunction(unsigned int x) {
 
 // Update and Read Encoder States
 void EncoderMotor::updatePosition() {
-    byte encA_read = digitalRead(encA);
-    byte encB_read = digitalRead(encB);
+    encA_read = digitalRead(encA);
+    encB_read = digitalRead(encB);
     if (encAFlag == 1) {
-        if (encA_read != encB_read) {
+        if (encB_read != encA_read) {
             position ++;
         } else {
             position --;
         }
+        encAFlag = 0;
+    
     } else if (encBFlag == 1) {
         if (encA_read != encB_read) {
             position --;
         } else {
             position ++;
         }
+        encBFlag = 0;
     }
 }
 

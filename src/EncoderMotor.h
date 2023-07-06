@@ -27,9 +27,11 @@ public:
     byte direction = 0;
     unsigned int frequency;
     int position = 0;
-    
-    byte encAFlag = 0;
-    byte encBFlag = 0;
+    byte encB_read = 0;
+    byte encA_read = 0;
+    byte* interruptA = &encAFlag;
+    byte* interruptB = &encBFlag;
+
 private:
     void updateFreq();
     unsigned int stepFunction(unsigned int x);
@@ -48,6 +50,9 @@ private:
     unsigned int powerBuffer;
     int lowBufferEdge;
     int highBufferEdge;
+
+    byte encAFlag = 0;
+    byte encBFlag = 0;
 };
 
 #endif //ENCODERMOTOR_H
