@@ -27,8 +27,6 @@ public:
     byte direction = 0;
     unsigned int frequency;
     int position = 0;
-    byte encB_read = 0;
-    byte encA_read = 0;
     byte* interruptA = &encAFlag;
     byte* interruptB = &encBFlag;
 
