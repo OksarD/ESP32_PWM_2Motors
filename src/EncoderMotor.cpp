@@ -1,8 +1,7 @@
 #include "EncoderMotor.h"
 
-
 // Configure Pin Modes
-void EncoderMotor::configurePins(byte encA_pin, byte encB_pin, byte enable_pin, byte in1_pin, byte in2_pin) {
+void EncoderMotor::setupPins(byte encA_pin, byte encB_pin, byte enable_pin, byte in1_pin, byte in2_pin) {
     encA = encA_pin;
     encB = encB_pin;
     enable = enable_pin;
@@ -15,17 +14,17 @@ void EncoderMotor::configurePins(byte encA_pin, byte encB_pin, byte enable_pin, 
 }
     
 // Configure ESP32 PWM and Dynamic Frequency Bounds
-void EncoderMotor::configurePWM(unsigned int pwmFreq_min, unsigned int pwmFreq_max, float power_threshold, byte freq_steps, byte pwm_channel, byte pwm_resolution) {
+void EncoderMotor::setupPWM(unsigned int pwmFreq_min, unsigned int pwmFreq_max, byte pwm_channel, byte pwm_resolution) {
     pwmFreqMin = pwmFreq_min;
     pwmFreqMax = pwmFreq_max;
     resolution = pwm_resolution;
-    freqSteps = freq_steps;
     channel = pwm_channel;
     maxPower = pow(2,resolution) - 1;
-    threshold = power_threshold * maxPower;
-    powerBuffer = (0.25 * threshold) / freqSteps;
-    lowBufferEdge = -powerBuffer;
-    highBufferEdge = powerBuffer;
+    freqSteps = 5;
+    threshold = 0.5 * maxPower;
+    tolerance = (0.25 * threshold) / freqSteps;
+    lowToleranceEdge = 0;
+    highToleranceEdge = 0;
     frequency = pwmFreqMax;
     prevFrequency = pwmFreqMax;
     stepHeight = (pwmFreqMax - pwmFreqMin) / freqSteps;
@@ -33,27 +32,36 @@ void EncoderMotor::configurePWM(unsigned int pwmFreq_min, unsigned int pwmFreq_m
     ledcSetup(channel, frequency, resolution);
 }
 
+// Adjust Dynamic Frequency Paramaters
+void EncoderMotor::changeFreqParamaters(float max_power_threshold = 0.5, byte frequency_steps = 5) {
+    freqSteps = frequency_steps;
+    threshold = max_power_threshold * maxPower;
+    //Update dependent variables
+    tolerance = (0.25 * threshold) / freqSteps;
+    stepHeight = (pwmFreqMax - pwmFreqMin) / freqSteps;    
+}
+
 // Update Power-Dependent Dynamic Frequency
 void EncoderMotor::updateFreq() {
     if (power < threshold) {
-        if (!(power > lowBufferEdge && power < highBufferEdge)) {
+        if (!(power > lowToleranceEdge && power < highToleranceEdge)) {
             frequency = stepFunction(power);
         }
     } else {
         frequency = pwmFreqMax;
     }
-    // Generate buffer zone upon a change in frequency, 
-    // to prevent quick frequency changes due to oscillating power values
+    // Generate tolerance interval when freuency steps, to prevent quick 
+    // frequency changes due to oscillating power values
     if (prevFrequency != frequency) {
-        highBufferEdge = power + powerBuffer;
-        lowBufferEdge = power - powerBuffer;
+        highToleranceEdge = power + tolerance;
+        lowToleranceEdge = power - tolerance;
         ledcChangeFrequency(channel, frequency, resolution);
     }
     prevFrequency = frequency;
 }
 
 // Compute Stepped Linear Frequency Function
-unsigned int EncoderMotor::stepFunction(unsigned int x) {
+unsigned short int EncoderMotor::stepFunction(unsigned int x) {
     return (floor(((pwmFreqMax - pwmFreqMin) * x) / (threshold * stepHeight)) * stepHeight) + pwmFreqMin;
 }
 
@@ -122,6 +130,6 @@ void EncoderMotor::setDirection(byte dir) {
     direction = dir;
 }
 
-unsigned int EncoderMotor::getMaxPower() {
+unsigned short int EncoderMotor::getMaxPower() {
     return maxPower;
 }

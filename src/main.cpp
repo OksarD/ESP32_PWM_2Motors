@@ -8,8 +8,6 @@ unsigned short int loopCycles = 0;
 // PWM Globals
 unsigned int pwmMinimumFreq = 50;
 unsigned int pwmMaximumFreq = 1000;
-float dynamicFreqPowerThreshold = 0.5;
-int frequencySteps = 5;
 byte pwmResolution = 10;
 
 // create encoder motor objects and map ISR array
@@ -27,10 +25,10 @@ void setup() {
   Serial.begin(115200);
 
   // config for encoder motor
-  m1.configurePins(35,34,14,27,26);
-  m1.configurePWM(pwmMinimumFreq,pwmMaximumFreq,dynamicFreqPowerThreshold,frequencySteps,0,pwmResolution);
-  m2.configurePins(39,36,32,25,33);
-  m2.configurePWM(pwmMinimumFreq,pwmMaximumFreq,dynamicFreqPowerThreshold,frequencySteps,1,pwmResolution);
+  m1.setupPins(35,34,14,27,26);
+  m1.setupPWM(pwmMinimumFreq,pwmMaximumFreq,0,pwmResolution);
+  m2.setupPins(39,36,32,25,33);
+  m2.setupPWM(pwmMinimumFreq,pwmMaximumFreq,1,pwmResolution);
 
   // encoder interrupt setup
   attachInterrupt(digitalPinToInterrupt(m1.encA), ISR<0>, CHANGE);
