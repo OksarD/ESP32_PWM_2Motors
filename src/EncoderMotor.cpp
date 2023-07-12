@@ -33,9 +33,9 @@ void EncoderMotor::setupPWM(unsigned int pwmFreq_min, unsigned int pwmFreq_max, 
 }
 
 // Adjust Dynamic Frequency Paramaters
-void EncoderMotor::changeFreqParamaters(float max_power_threshold = 0.5, byte frequency_steps = 5) {
-    freqSteps = frequency_steps;
-    threshold = max_power_threshold * maxPower;
+void EncoderMotor::changeFreqParamaters(float max_power_threshold = NULL, byte frequency_steps = NULL) {
+    if (frequency_steps != NULL) { frequency = frequency_steps; }
+    if (max_power_threshold != NULL) { maxPower = max_power_threshold * maxPower; }
     //Update dependent variables
     tolerance = (0.25 * threshold) / freqSteps;
     stepHeight = (pwmFreqMax - pwmFreqMin) / freqSteps;    

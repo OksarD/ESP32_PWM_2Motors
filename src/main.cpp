@@ -49,18 +49,16 @@ void loop() {
   loopTime = (elapsedTime / 1000) % 8000; // time in milliseconds (resets every 8 seconds)
   unsigned int loopTimeSec = loopTime / 1000;
   // cycle through movements
-  if (loopTimeSec == 0) {
-    m1.setPower(m1.getMaxPower() * 0.25);
+  if (loopTimeSec == 2) {
+    m1.setPower(m1.getMaxPower());
     m1.setDirection(1);
-  } else if (loopTimeSec == 2) {
-    m2.setPower(m2.getMaxPower() * 0.25);
+    m2.setPower(m2.getMaxPower());
     m2.setDirection(1);
-  } else if (loopTimeSec == 4) {
-    m1.setPower(m1.getMaxPower() * 0.25);
-    m1.setDirection(0);
   } else if (loopTimeSec == 6) {
     m2.setPower(m2.getMaxPower() * 0.25);
     m2.setDirection(0);
+    m1.setPower(m1.getMaxPower() * 0.25);
+    m1.setDirection(0);
   }
   
 
