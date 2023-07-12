@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <EncoderMotor.h>
+#include <IMU.h>
 
 unsigned int loopTime;
 unsigned long elapsedTime;
@@ -13,13 +14,16 @@ byte pwmResolution = 10;
 // create encoder motor objects and map ISR array
 EncoderMotor m1;
 EncoderMotor m2;
-byte* interruptArray[4] = {m1.interruptA,m1.interruptB,m2.interruptA,m2.interruptB};
+volatile byte* interruptArray[4] = {m1.interruptA,m1.interruptB,m2.interruptA,m2.interruptB};
 
 // ISR
 template <byte i>
 void IRAM_ATTR ISR() {
   *interruptArray[i] = 1;
 }
+
+// Declare Serial printing function (definition underneath main loop)
+void printData();
 
 void setup() {
   Serial.begin(115200);
@@ -40,11 +44,22 @@ void setup() {
   m1.driveMotor(0,0);
   m2.driveMotor(0,0);
 
-  delay(1000);
+  //IMU Setup (refer to IMU.cpp)
+  IMUsetup();
+  
+  // wait until character is sent before beginning loop
+  Serial.println(F("\nSend any character to begin."));
+  while (Serial.available() && Serial.read()); // empty buffer
+  while (!Serial.available());                 // wait for data
+  while (Serial.available() && Serial.read()); // empty buffer again
+
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
+
+  IMUloop();
+
   elapsedTime = esp_timer_get_time();
   loopTime = (elapsedTime / 1000) % 8000; // time in milliseconds (resets every 8 seconds)
   unsigned int loopTimeSec = loopTime / 1000;
@@ -84,29 +99,54 @@ void loop() {
   interrupts(); // resume interrupts
 
   // print data every 1000 cycles of code
-  if (loopCycles > 1000) {
-    Serial.print("Time: ");
-    Serial.print(loopTime);
-    Serial.print(", M1 pwm: ");
-    Serial.print(m1.power);
-    Serial.print(", dir: ");
-    Serial.print(m1.direction);
-    Serial.print(", freq: ");
-    Serial.print(m1.frequency);
-    Serial.print(", pos: ");
-    Serial.print(m1.position);
-    Serial.print(", M2 pwm: ");
-    Serial.print(m2.power);
-    Serial.print(", dir: ");
-    Serial.print(m2.direction);
-    Serial.print(", freq: ");
-    Serial.print(m2.frequency);
-    Serial.print(", pos: ");
-    Serial.print(m2.position);
+  printData();
+  
+}
+
+void printData() {
+  if (loopCycles > 200) {
+    // Time Data
+    // Serial.print("Time: ");
+    // Serial.print(elapsedTime);
+
+    // Motor Data
+    // Serial.print("; M1 pwm: ");
+    // Serial.print(m1.power);
+    // Serial.print(", dir: ");
+    // Serial.print(m1.direction);
+    // Serial.print(", freq: ");
+    // Serial.print(m1.frequency);
+    // Serial.print(", pos: ");
+    // Serial.print(m1.position);
+
+    // Serial.print("; M2 pwm: ");
+    // Serial.print(m2.power);
+    // Serial.print(", dir: ");
+    // Serial.print(m2.direction);
+    // Serial.print(", freq: ");
+    // Serial.print(m2.frequency);
+    // Serial.print(", pos: ");
+    // Serial.print(m2.position);
+
+    // IMU Data
+    Serial.print(", ypr: ");
+    Serial.print(ypr[0] * 180/M_PI);
+    Serial.print(", ");
+    Serial.print(ypr[1] * 180/M_PI);
+    Serial.print(", ");
+    Serial.print(ypr[2] * 180/M_PI);
+
+    // Serial.print("; areal: ");
+    // Serial.print(aaReal.x);
+    // Serial.print(", ");
+    // Serial.print(aaReal.y);
+    // Serial.print(", ");
+    // Serial.print(aaReal.z);
+
+    // New line
     Serial.println();
     loopCycles = 0;
   } else {
     loopCycles ++;
   }
 }
-

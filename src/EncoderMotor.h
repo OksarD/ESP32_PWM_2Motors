@@ -27,8 +27,8 @@ public:
     byte direction = 0;
     unsigned int frequency;
     long position = 0;
-    byte* interruptA = &encAFlag;
-    byte* interruptB = &encBFlag;
+    volatile byte* interruptA = &encAFlag;
+    volatile byte* interruptB = &encBFlag;
 
 private:
     void updateFreq();
@@ -49,8 +49,8 @@ private:
     int lowToleranceEdge;
     int highToleranceEdge;
 
-    byte encAFlag = 0;
-    byte encBFlag = 0;
+    volatile byte encAFlag = 0;
+    volatile byte encBFlag = 0;
 };
 
 #endif //ENCODERMOTOR_H
