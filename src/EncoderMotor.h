@@ -32,8 +32,6 @@ private:
     byte enable;
     byte dirPin;
     byte brakePin;
-    byte in1;
-    byte in2;
     volatile bool encAFlag = 0;
     volatile bool encBFlag = 0;
 

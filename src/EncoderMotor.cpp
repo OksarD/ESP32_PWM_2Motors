@@ -9,8 +9,8 @@ void EncoderMotor::setupPins(byte encA_pin, byte encB_pin, byte enable_pin, byte
     brakePin = brake_pin;
     pinMode(encA, INPUT);
     pinMode(encB, INPUT);
-    pinMode(in1, OUTPUT);
-    pinMode(in2, OUTPUT);
+    pinMode(dirPin, OUTPUT);
+    pinMode(brakePin, OUTPUT);
 }
     
 // Configure ESP32 PWM for Motor
@@ -28,19 +28,12 @@ void EncoderMotor::updatePosition() {
     bool encA_read = digitalRead(encA);
     bool encB_read = digitalRead(encB);
     if (encAFlag) {
-        if (encB_read != encA_read) {
-            position ++;
-        } else {
-            position --;
-        }
+        if (encB_read != encA_read) position ++;
+        else position --;
         encAFlag = 0;
-    
     } else if (encBFlag) {
-        if (encA_read != encB_read) {
-            position --;
-        } else {
-            position ++;
-        }
+        if (encA_read != encB_read) position --;
+        else position ++;
         encBFlag = 0;
     }
 }

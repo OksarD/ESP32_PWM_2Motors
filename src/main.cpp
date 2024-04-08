@@ -38,10 +38,10 @@ void setup() {
   //IMUsetup();
   
   // wait until character is sent before beginning loop
-  Serial.println(F("\nSend any character to begin."));
-  while (Serial.available() && Serial.read()); // empty buffer
-  while (!Serial.available());                 // wait for data
-  while (Serial.available() && Serial.read()); // empty buffer again
+  // Serial.println(F("\nSend any character to begin."));
+  // while (Serial.available() && Serial.read()); // empty buffer
+  // while (!Serial.available());                 // wait for data
+  // while (Serial.available() && Serial.read()); // empty buffer again
 
 }
 
