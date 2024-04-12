@@ -1,85 +1,87 @@
 #include <Arduino.h>
-#include <EncoderMotor.h>
+#include <SpeedMotor.h>
 #include <IMU.h>
 
+// Macros
+#define SC_PIN 19
+#define PWM_PIN 33
+#define DIR_PIN 25
+
 // Globals
-unsigned int pwmFreq = 5000;
-byte pwmResolution = 10;
 unsigned short loopCycles = 0;
 
+unsigned int pwmFreq = 5000;
+byte pwmResolution = 10;
+unsigned long elapsedTime = 0;
+int motorPower = 0;
+
 // Create encoder motor objects and map ISR array
-EncoderMotor m1;
-volatile bool* interruptArray[2] = {m1.getInterruptA(),m1.getInterruptB()};
+SpeedMotor m1;
+volatile bool* interruptArray[2] = {m1.getInterrupt()};
 
 // ISR
 template <byte i>
-void IRAM_ATTR ISR() {
+void IRAM_ATTR ISR()
+{
   *interruptArray[i] = 1;
 }
 
 // Prototypes
 void printData();
+void boolInvert(bool var);
 
-void setup() {
+// Main Setup
+void setup()
+{
   Serial.begin(115200);
 
   // config for encoder motor
-  m1.setupPins(35,34,12,14,27);
+  m1.setupPins(35,34,12,14);
   m1.setupPWM(pwmFreq,0,pwmResolution);
 
   // encoder interrupt setup
-  attachInterrupt(digitalPinToInterrupt(m1.getEncA()), ISR<0>, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(m1.getEncB()), ISR<1>, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(m1.getSC()), ISR<0>, CHANGE);
 
-  // set motors to stop
+  // start Motor
   m1.stopMotor();
 
-  //IMU Setup (refer to IMU.cpp)
-  //IMUsetup();
-  
+  // IMU Setup
+  // IMUsetup();
+
   // wait until character is sent before beginning loop
-  // Serial.println(F("\nSend any character to begin."));
-  // while (Serial.available() && Serial.read()); // empty buffer
-  // while (!Serial.available());                 // wait for data
-  // while (Serial.available() && Serial.read()); // empty buffer again
+  Serial.println(F("\nSend any character to begin."));
 
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
-
+// Main Loop
+void loop()
+{
   //IMUloop();
-  // elapsedTime = esp_timer_get_time();
 
   // cycle through movements
-  m1.setPower(m1.getMaxPower());
-  m1.setDirection(0);
-
-  // drive motors
+  motorPower = m1.getMaxPower()*sin(elapsedTime/1e6);
+  m1.setPower(motorPower);
+  m1.setDirection(signToBool(motorPower));
   m1.driveMotor();
 
   // read encoders and update position
   noInterrupts(); //set interrupts aside
-  m1.updatePosition();
+  m1.update();
   interrupts(); // resume interrupts
 
   // print data every so often
   printData();
-  
 }
 
-void printData() {
-  if (loopCycles > 200) {
-    // Time Data
-    // Serial.print("Time: ");
-    // Serial.print(elapsedTime);
+void printData()
+{
+  if (loopCycles > 10)
+  {
+    Serial.print("Time: ");
+    Serial.print(esp_timer_get_time());
 
     // Motor Data
-    Serial.print("; M1 pwr: ");
-    Serial.print(m1.getPower());
-    Serial.print(", dir: ");
-    Serial.print(m1.getDirection());
-    Serial.print(", pos: ");
+    Serial.print(", Pos: ");
     Serial.print(m1.getPosition());
 
     // IMU Data
@@ -100,7 +102,26 @@ void printData() {
     // New line
     Serial.println();
     loopCycles = 0;
+  }
+  else
+  {
+    loopCycles++;
+  }
+}
+
+
+void boolInvert(bool var) {
+    if (var) {
+        var = 0;
+    } else {
+        var = 1;
+    }
+}
+
+bool signToBool(int var) {
+  if (var < 0) {
+    return 1;
   } else {
-    loopCycles ++;
+    return 0;
   }
 }
