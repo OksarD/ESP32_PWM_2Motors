@@ -1,5 +1,6 @@
 #include "EncoderMotor.h"
 
+
 // Configure Pins for Motor
 void EncoderMotor::setupPins(byte encA_pin, byte encB_pin, byte enable_pin, byte dir_pin, byte brake_pin) {
     encA = encA_pin;
@@ -24,26 +25,38 @@ void EncoderMotor::setupPWM(unsigned int pwm_Freq, byte pwm_channel, byte pwm_re
 }
 
 // Update and Read Encoder States
-void EncoderMotor::updatePosition() {
-    bool encA_read = digitalRead(encA);
-    bool encB_read = digitalRead(encB);
+void EncoderMotor::update() {
     if (encAFlag) {
-        if (encB_read != encA_read) position ++;
-        else position --;
+        boolInvert(encA_state);
+        bool encB_state = digitalRead(encB);
         encAFlag = 0;
+        if (encB_state != encA_state) {
+            direction = 0;
+            position ++;
+        } else {
+            direction = 1;
+            position --;
+        }
     } else if (encBFlag) {
-        if (encA_read != encB_read) position --;
-        else position ++;
+        boolInvert(encB_state);
+        bool encA_state = digitalRead(encA);
         encBFlag = 0;
+        if (encA_state != encB_state) {
+            direction = 1;
+            position --;
+        } else {
+            direction = 0;
+            position ++;
+        }
     }
 }
 
 // Drive Motor using PWM and Direction controls
 void EncoderMotor::driveMotor(unsigned int pwr, bool dir) {
     power = pwr;
-    direction = dir;
+    targetDirection = dir;
     ledcWrite(channel, power);
-    if (direction) {
+    if (targetDirection) {
         digitalWrite(dirPin, HIGH);
     } else {
         digitalWrite(dirPin, LOW);
@@ -52,7 +65,7 @@ void EncoderMotor::driveMotor(unsigned int pwr, bool dir) {
 
 void EncoderMotor::driveMotor() {
     ledcWrite(channel, power);
-    if (direction) {
+    if (targetDirection) {
         digitalWrite(dirPin, HIGH);
     } else {
         digitalWrite(dirPin, LOW);
@@ -75,7 +88,7 @@ void EncoderMotor::setPower(unsigned int pwr) {
 }
 
 void EncoderMotor::setDirection(bool dir) {
-    direction = dir;
+    targetDirection = dir;
 }
 
 unsigned short int EncoderMotor::getMaxPower() {
@@ -90,6 +103,14 @@ volatile bool* EncoderMotor::getInterruptA() {
     return &encAFlag;
 }
 
-volatile bool* EncoderMotor::getInterruptA() {
+volatile bool* EncoderMotor::getInterruptB() {
     return &encBFlag;
+}
+
+void EncoderMotor::boolInvert(bool var) {
+    if (var) {
+        var = 0;
+    } else {
+        var = 1;
+    }
 }
