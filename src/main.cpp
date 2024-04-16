@@ -1,11 +1,13 @@
 #include <Arduino.h>
 #include <SpeedMotor.h>
 #include <IMU.h>
+#include <MotorPID.h>
 
 // Macros
 #define SC_PIN 19
-#define PWM_PIN 33
+#define PWR_PIN 26
 #define DIR_PIN 25
+#define BRAKE_PIN 33
 
 // Globals
 unsigned short loopCycles = 0;
@@ -17,7 +19,7 @@ int motorPower = 0;
 
 // Create encoder motor objects and map ISR array
 SpeedMotor m1;
-volatile bool* interruptArray[2] = {m1.getInterrupt()};
+volatile bool* interruptArray[1] = {m1.getInterrupt()};
 
 // ISR
 template <byte i>
@@ -29,6 +31,7 @@ void IRAM_ATTR ISR()
 // Prototypes
 void printData();
 void boolInvert(bool var);
+bool signToBool(int var);
 
 // Main Setup
 void setup()
@@ -36,7 +39,7 @@ void setup()
   Serial.begin(115200);
 
   // config for encoder motor
-  m1.setupPins(35,34,12,14);
+  m1.setupPins(SC_PIN, PWR_PIN, DIR_PIN, BRAKE_PIN);
   m1.setupPWM(pwmFreq,0,pwmResolution);
 
   // encoder interrupt setup
@@ -56,14 +59,14 @@ void setup()
 // Main Loop
 void loop()
 {
+  elapsedTime = esp_timer_get_time();
   //IMUloop();
 
   // cycle through movements
-  motorPower = m1.getMaxPower()*sin(elapsedTime/1e6);
-  m1.setPower(motorPower);
+  motorPower = -m1.getMaxPower()*sin((2*PI*elapsedTime/(1e6*20)));
+  m1.setPower(abs(motorPower));
   m1.setDirection(signToBool(motorPower));
   m1.driveMotor();
-
   // read encoders and update position
   noInterrupts(); //set interrupts aside
   m1.update();
@@ -75,15 +78,20 @@ void loop()
 
 void printData()
 {
-  if (loopCycles > 10)
+  if (loopCycles > 5000)
   {
     Serial.print("Time: ");
     Serial.print(esp_timer_get_time());
 
     // Motor Data
+    Serial.print(", Pwr: ");
+    Serial.print(m1.getPower());
+    Serial.print(", Dir: ");
+    Serial.print(m1.getDirection());
     Serial.print(", Pos: ");
     Serial.print(m1.getPosition());
-
+    Serial.print(", RPM: ");
+    Serial.print(m1.getSpeed()*0.6667);
     // IMU Data
     // Serial.print(", ypr: ");
     // Serial.print(ypr[0] * 180/M_PI);
@@ -109,19 +117,12 @@ void printData()
   }
 }
 
-
 void boolInvert(bool var) {
-    if (var) {
-        var = 0;
-    } else {
-        var = 1;
-    }
+    if (var) var = 0;
+    else var = 1;
 }
 
 bool signToBool(int var) {
-  if (var < 0) {
-    return 1;
-  } else {
-    return 0;
-  }
+  if (var < 0) return 1;
+  else return 0;
 }

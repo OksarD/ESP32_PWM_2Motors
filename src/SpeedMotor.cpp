@@ -31,15 +31,18 @@ void SpeedMotor::update() {
         } else {
             position ++;
         }
+        currentTime = esp_timer_get_time();
+        speed = 1e6/(currentTime - prevTime);
+        prevTime = currentTime;
     }
 }
 
 // Drive Motor using PWM and Direction controls
 void SpeedMotor::driveMotor(unsigned int pwr, bool dir) {
     power = pwr;
-    targetDirection = dir;
+    direction = dir;
     ledcWrite(channel, power);
-    if (targetDirection) {
+    if (direction) {
         digitalWrite(dirPin, HIGH);
     } else {
         digitalWrite(dirPin, LOW);
@@ -48,7 +51,7 @@ void SpeedMotor::driveMotor(unsigned int pwr, bool dir) {
 
 void SpeedMotor::driveMotor() {
     ledcWrite(channel, power);
-    if (targetDirection) {
+    if (direction) {
         digitalWrite(dirPin, HIGH);
     } else {
         digitalWrite(dirPin, LOW);
@@ -71,7 +74,7 @@ void SpeedMotor::setPower(unsigned int pwr) {
 }
 
 void SpeedMotor::setDirection(bool dir) {
-    targetDirection = dir;
+    direction = dir;
 }
 
 unsigned short int SpeedMotor::getMaxPower() {
@@ -86,10 +89,18 @@ volatile bool* SpeedMotor::getInterrupt() {
     return &scFlag;
 }
 
-void SpeedMotor::boolInvert(bool var) {
-    if (var) {
-        var = 0;
-    } else {
-        var = 1;
-    }
+byte SpeedMotor::getSC() {
+    return scPin;
+}
+
+long SpeedMotor::getPosition() {
+    return position;
+}
+
+bool SpeedMotor::getDirection() {
+    return direction;
+}
+
+double SpeedMotor::getSpeed() {
+    return speed;
 }
