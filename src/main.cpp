@@ -23,19 +23,18 @@ unsigned short maxPower = pow(2,pwmResolution) - 1;
 unsigned long elapsedTime = 0;
 unsigned long prevTime = 0;
 int motorPower;
-unsigned int minPower = 20;
+unsigned int minPower = 0;
 
 // PID values
 float targetAngle = 0;
 float error = 0;
 float prevError = 0;
-float errorSum = 0;
 float angle = 0;
 float proportional = 0;
 float integral = 0;
 float derivative = 0;
 float Kp = 40;
-float Ki = 0.015;
+float Ki = 0.02;
 float Kd = 500;
 
 // P algorithm for position
@@ -43,7 +42,7 @@ int Pos[2] = {0,0};
 int targetPos[2] = {0,0};
 int posError[2] = {0,0};
 int posProp[2] = {0,0};
-float PosKp = 0.1;
+float PosKp = 0.01;
 
 // Create encoder motor objects and map ISR array
 SpeedMotor m1;
@@ -89,7 +88,6 @@ void setup()
 // Main Loop
 void loop()
 {
-  elapsedTime = esp_timer_get_time();
   IMUloop();
 
   // P for target angle
@@ -104,10 +102,10 @@ void loop()
   // PID for motor output
   angle = -ypr[2]*180/PI;
   error = targetAngle - angle;
-  errorSum += error;
-  errorSum = inRange(-maxPower/Ki, errorSum, maxPower/Ki);
+  integral += Ki*error;
+  integral = inRange(-maxPower, integral, maxPower);
   proportional = Kp*error;
-  integral = Ki*errorSum;
+  elapsedTime = esp_timer_get_time();
   derivative = Kd*1e6*(error - prevError)/(elapsedTime - prevTime);
   motorPower = proportional + integral;// + derivative;
   prevTime = elapsedTime;
@@ -145,12 +143,13 @@ void printData()
 {
   if (loopCycles > 500)
   {
-    Serial.printf("Time: %i, ", esp_timer_get_time());
+    Serial.printf("t: %.2f, ", esp_timer_get_time()/1e6);
 
     // Motor Data
-    //Serial.printf("Pwr1: %i, Dir1: %i, ", m1.getPower(), m1.getDirection());
-    //Serial.printf("Pwr2: %i, Dir2: %i, ", m2.getPower(), m2.getDirection());
+    // Serial.printf("Pwr1: %i, Dir1: %i, ", m1.getPower(), m1.getDirection());
+    // Serial.printf("Pwr2: %i, Dir2: %i, ", m2.getPower(), m2.getDirection());
     // Serial.printf("Pos: %i, RPM: %.2f, ", m1.getPosition(), m1.getSpeed()*0.6667);
+    
     // IMU Data
     Serial.printf("ypr: %.4f, %.4f, %.4f, ", ypr[0]*180/M_PI, ypr[1]*180/M_PI, ypr[2]*180/M_PI);
 
@@ -162,7 +161,10 @@ void printData()
     // Serial.print(aaReal.z);
 
     // PID Data
-    Serial.printf("PID: %.2f, %.2f, %.2f, ", proportional, integral, derivative);
+    Serial.printf("PID: %.4f, %.4f, %.4f, ", proportional, integral, derivative);
+
+    //Derivative
+    Serial.printf("DeltaT: %i, DetlaE %i", elapsedTime - prevTime, error - prevError);
 
     // New line
     Serial.println();
