@@ -17,7 +17,6 @@ void SpeedMotor::setupPWM(unsigned int pwm_Freq, byte pwm_channel, byte pwm_reso
     pwmFreq = pwm_Freq;
     resolution = pwm_resolution;
     channel = pwm_channel;
-    maxPower = pow(2,resolution) - 1;
     ledcAttachPin(enable, channel);
     ledcSetup(channel, pwmFreq, resolution);
 }
@@ -37,48 +36,12 @@ void SpeedMotor::update() {
     }
 }
 
-// Drive Motor using PWM and Direction controls
-void SpeedMotor::driveMotor(unsigned int pwr, bool dir) {
-    power = pwr;
-    direction = dir;
-    ledcWrite(channel, power);
-    if (direction) {
-        digitalWrite(dirPin, HIGH);
-    } else {
-        digitalWrite(dirPin, LOW);
-    }
-}
-
-void SpeedMotor::driveMotor() {
-    ledcWrite(channel, power);
-    if (direction) {
-        digitalWrite(dirPin, HIGH);
-    } else {
-        digitalWrite(dirPin, LOW);
-    }
-}
-
-void SpeedMotor::stopMotor() {
-    power = 0;
-    ledcWrite(channel, power);
-}
-
-void SpeedMotor::brakeMotor() {
-    power = 0;
-    ledcWrite(channel, power);
-    digitalWrite(brakePin, HIGH);
-}
-
 void SpeedMotor::setPower(unsigned int pwr) {
     power = pwr;
 }
 
 void SpeedMotor::setDirection(bool dir) {
     direction = dir;
-}
-
-unsigned short int SpeedMotor::getMaxPower() {
-    return maxPower;
 }
 
 unsigned short int SpeedMotor::getPower() {
@@ -93,7 +56,7 @@ byte SpeedMotor::getSC() {
     return scPin;
 }
 
-long SpeedMotor::getPosition() {
+int SpeedMotor::getPosition() {
     return position;
 }
 
@@ -101,6 +64,10 @@ bool SpeedMotor::getDirection() {
     return direction;
 }
 
-double SpeedMotor::getSpeed() {
+float SpeedMotor::getSpeed() {
     return speed;
+}
+
+void SpeedMotor::resetPosition() {
+    position = 0;
 }

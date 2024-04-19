@@ -3,11 +3,13 @@
 MPU6050 mpu;
 
 #define OUTPUT_READABLE_YAWPITCHROLL
-#define OUTPUT_READABLE_REALACCEL
+//#define OUTPUT_READABLE_REALACCEL
 
 #define INTERRUPT_PIN 23 
 #define LED_PIN 2
 bool blinkState = false;
+byte average_num = 4;
+int average_cycles = 0;
 
 // orientation/motion vars
 Quaternion q;           // [w, x, y, z]         quaternion container
@@ -105,6 +107,8 @@ void IMUloop() {
             mpu.dmpGetQuaternion(&q, fifoBuffer);
             mpu.dmpGetGravity(&gravity, &q);
             mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+
+
         #endif
         #ifdef OUTPUT_READABLE_REALACCEL
             // display real acceleration, adjusted to remove gravity
@@ -115,6 +119,7 @@ void IMUloop() {
 
         #endif
         // blink LED to indicate activity
+        average_cycles ++;
         blinkState = !blinkState;
         digitalWrite(LED_PIN, blinkState);
     }
