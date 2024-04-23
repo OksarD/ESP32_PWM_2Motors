@@ -33,16 +33,16 @@ float angle = 0;
 float proportional = 0;
 float integral = 0;
 float derivative = 0;
-float Kp = 40;
-float Ki = 0.02;
-float Kd = 500;
+float Kp = 10;
+float Ki = 0.03;
+float Kd = 20;
 
 // P algorithm for position
 int Pos[2] = {0,0};
 int targetPos[2] = {0,0};
 int posError[2] = {0,0};
 int posProp[2] = {0,0};
-float PosKp = 0.01;
+float PosKp = 0.05;
 
 // Create encoder motor objects and map ISR array
 SpeedMotor m1;
@@ -97,7 +97,7 @@ void loop()
     posError[i] = targetPos[i] - Pos[i];
     posProp[i] = PosKp * posError[i];
   }
-  targetAngle = (posProp[0] + posProp[1])/2;
+  //targetAngle = (posProp[0] + posProp[1])/2;
 
   // PID for motor output
   angle = -ypr[2]*180/PI;
@@ -105,11 +105,14 @@ void loop()
   integral += Ki*error;
   integral = inRange(-maxPower, integral, maxPower);
   proportional = Kp*error;
-  elapsedTime = esp_timer_get_time();
-  derivative = Kd*1e6*(error - prevError)/(elapsedTime - prevTime);
-  motorPower = proportional + integral;// + derivative;
-  prevTime = elapsedTime;
-  prevError = error;
+  if (loopCycles % 50 == 0) {
+    elapsedTime = esp_timer_get_time();
+    derivative = Kd*1e6*(error - prevError)/(elapsedTime - prevTime);
+    // Serial.printf("DT: %i, DE: %.4f, ", elapsedTime - prevTime, error - prevError);
+    prevTime = elapsedTime;
+    prevError = error;
+  } 
+  motorPower = proportional + integral + derivative;
 
   //motorPower = -maxPower*sin((2*PI*elapsedTime/(1e6*20)));
 
@@ -137,13 +140,14 @@ void loop()
 
   // print data every so often
   printData();
+  loopCycles ++;
 }
 
 void printData()
 {
-  if (loopCycles > 500)
+  if (loopCycles % 500 == 0)
   {
-    Serial.printf("t: %.2f, ", esp_timer_get_time()/1e6);
+    Serial.printf("c: %i, ", loopCycles);
 
     // Motor Data
     // Serial.printf("Pwr1: %i, Dir1: %i, ", m1.getPower(), m1.getDirection());
@@ -164,15 +168,10 @@ void printData()
     Serial.printf("PID: %.4f, %.4f, %.4f, ", proportional, integral, derivative);
 
     //Derivative
-    Serial.printf("DeltaT: %i, DetlaE %i", elapsedTime - prevTime, error - prevError);
+    
 
     // New line
     Serial.println();
-    loopCycles = 0;
-  }
-  else
-  {
-    loopCycles++;
   }
 }
 
