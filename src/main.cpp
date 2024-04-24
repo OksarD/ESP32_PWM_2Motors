@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <SpeedMotor.h>
-#include <IMU.h>
+#include <ReadI2C.h>
 #include <MotorPID.h>
 
 // Macros
@@ -65,8 +65,7 @@ float inRange(float min_val, float var, float max_val);
 // Main Setup
 void setup()
 {
-  Serial.begin(115200);
-
+  
   // config for encoder motor
   m1.setupPins(SC_PIN_1, PWR_PIN_1, DIR_PIN_1, BRK_PIN_1);
   m1.setupPWM(pwmFreq,CHANNEL_1,pwmResolution);
@@ -78,7 +77,7 @@ void setup()
   attachInterrupt(digitalPinToInterrupt(m2.getSC()), ISR<1>, CHANGE);
 
   // IMU Setup
-  IMUsetup();
+  I2Csetup();
 
   // wait until character is sent before beginning loop
   Serial.println(F("\nSend any character to begin."));
@@ -88,7 +87,7 @@ void setup()
 // Main Loop
 void loop()
 {
-  IMUloop();
+  I2Cloop();
 
   // P for target angle
   Pos[0] = m1.getPosition();

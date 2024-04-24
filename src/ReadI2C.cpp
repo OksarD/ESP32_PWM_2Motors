@@ -1,4 +1,4 @@
-#include "IMU.h"
+#include "ReadI2C.h"
 
 MPU6050 mpu;
 
@@ -7,9 +7,10 @@ MPU6050 mpu;
 
 #define INTERRUPT_PIN 23 
 #define LED_PIN 2
+#define AD0_PIN 22
+#define DATA_PIN 21
+
 bool blinkState = false;
-byte average_num = 4;
-int average_cycles = 0;
 
 // orientation/motion vars
 Quaternion q;           // [w, x, y, z]         quaternion container
@@ -17,6 +18,7 @@ VectorInt16 aa;         // [x, y, z]            accel sensor measurements
 VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
 VectorFloat gravity;    // [x, y, z]            gravity vector
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
+extern short rcAnalogs[5]; 
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
@@ -25,17 +27,23 @@ uint8_t devStatus;      // return status after each device operation (0 = succes
 uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
 uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
+uint8_t rcBuffer[9];   // RC storage buffer
+extern bool ch3State = 0;
+extern bool ch4State = 0;
+extern byte ch7State = 0;
+
 
 volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
 void dmpDataReady() {
     mpuInterrupt = true;
 }
 
-void IMUsetup() {
-    // join I2C bus (I2Cdev library doesn't do this automatically)
+void I2Csetup() {
+    // join I2C bus (I2Cdev library doesn't do this automatically:
     Wire.begin();
     Wire.setClock(400000); // 200kHz I2C clock.
-
+    Serial.begin(115200);
+    
     // initialize serial communication
     while (!Serial); // wait for enumeration, others continue immediately
 
@@ -43,6 +51,7 @@ void IMUsetup() {
     Serial.println(F("Initializing I2C devices..."));
     mpu.initialize();
     pinMode(INTERRUPT_PIN, INPUT);
+    pinMode(AD0_PIN, OUTPUT);
 
     // verify connection
     Serial.println(F("Testing device connections..."));
@@ -96,10 +105,24 @@ void IMUsetup() {
     pinMode(LED_PIN, OUTPUT);
 }
 
-void IMUloop() {
+void I2Cloop() {
+    digitalWrite(AD0_PIN, HIGH);
+    Wire.requestFrom(0x60, 9);
+    for (byte i = 0; i < 9; i++) {
+        while(!Wire.available());
+        rcBuffer[i] = Wire.read();
+    }
+    for (byte i = 0; i < 4; i++) {
+        rcAnalogs[i] = rcBuffer[(2*i)-1] << 8 + rcBuffer[2*i];
+    }
+    ch3State = rcBuffer[9] & 0b0001;
+    ch4State = (rcBuffer[9] & 0b0010) >> 1;
+    ch7State = rcBuffer[9] >> 2;
+
     // if programming failed, don't try to do anything
     if (!dmpReady) return;
     // read a packet from FIFO
+    digitalWrite(AD0_PIN, LOW);
     if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
 
         #ifdef OUTPUT_READABLE_YAWPITCHROLL
@@ -119,7 +142,6 @@ void IMUloop() {
 
         #endif
         // blink LED to indicate activity
-        average_cycles ++;
         blinkState = !blinkState;
         digitalWrite(LED_PIN, blinkState);
     }
