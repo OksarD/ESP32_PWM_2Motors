@@ -17,10 +17,10 @@ VectorInt16 aa;         // [x, y, z]            accel sensor measurements
 VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
 VectorFloat gravity;    // [x, y, z]            gravity vector
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
-extern short rcAnalogs[4]; 
-extern bool ch3State = 0;
-extern bool ch4State = 0;
-extern byte ch7State = 0;
+short rcAnalogs[4]; 
+bool ch3State = 0;
+bool ch4State = 0;
+byte ch7State = 0;
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
@@ -49,7 +49,6 @@ void I2Csetup() {
     Serial.println(F("Initializing I2C devices..."));
     mpu.initialize();
     pinMode(INTERRUPT_PIN, INPUT);
-    pinMode(AD0_PIN, OUTPUT);
 
     // verify connection
     Serial.println(F("Testing device connections..."));

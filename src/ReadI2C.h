@@ -14,8 +14,9 @@ extern VectorInt16 aa;         // [x, y, z]            accel sensor measurements
 extern VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
 extern VectorFloat gravity;    // [x, y, z]            gravity vector
 extern float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
-extern short rcAnalogs[4];            // [CH1, CH2, CH5, CH6, (CH3, CH4 << 1, CH7 << 3)] radio reciever data
-extern bool ch3State = 0;
-extern bool ch4State = 0;
-extern byte ch7State = 0;
+extern short rcAnalogs[4];     // [CH1, CH2, CH5, CH6] radio reciever data
+extern bool ch3State;
+extern bool ch4State;
+extern byte ch7State;
+
 #endif //READI2C_H
