@@ -65,7 +65,10 @@ float inRange(float min_val, float var, float max_val);
 // Main Setup
 void setup()
 {
-  
+  Wire.begin();
+  Wire.setClock(400000); // 200kHz I2C clock.
+  Serial.begin(115200);
+
   // config for encoder motor
   m1.setupPins(SC_PIN_1, PWR_PIN_1, DIR_PIN_1, BRK_PIN_1);
   m1.setupPWM(pwmFreq,CHANNEL_1,pwmResolution);
@@ -76,8 +79,12 @@ void setup()
   attachInterrupt(digitalPinToInterrupt(m1.getSC()), ISR<0>, CHANGE);
   attachInterrupt(digitalPinToInterrupt(m2.getSC()), ISR<1>, CHANGE);
 
-  // IMU Setup
-  I2Csetup();
+  // I2C Setup
+  IMUinit();
+  RCinit();
+
+  Serial.println(F("Initializing I2C devices..."));
+  while (!Serial);
 
   // wait until character is sent before beginning loop
   Serial.println(F("\nSend any character to begin."));
@@ -87,7 +94,8 @@ void setup()
 // Main Loop
 void loop()
 {
-  I2Cloop();
+  IMUloop();
+  RCloop();
 
   // P for target angle
   Pos[0] = m1.getPosition();
@@ -112,8 +120,7 @@ void loop()
     prevError = error;
   } 
   motorPower = proportional + integral + derivative;
-
-  //motorPower = -maxPower*sin((2*PI*elapsedTime/(1e6*20)));
+  // motorPower = -maxPower*sin((2*PI*elapsedTime/(1e6*20)));
 
   // Set power, including exclusion zone
   unsigned int realPower = inRange(0, abs(motorPower), maxPower-minPower) + minPower;
@@ -144,31 +151,23 @@ void loop()
 
 void printData()
 {
-  if (loopCycles % 500 == 0)
+  if (loopCycles % 50 == 0)
   {
+    // Main Loop Cycles
     Serial.printf("c: %i, ", loopCycles);
-
     // Motor Data
     // Serial.printf("Pwr1: %i, Dir1: %i, ", m1.getPower(), m1.getDirection());
+    // Serial.printf("Pos2: %i, RPM2: %.2f, ", m2.getPosition(), m2.getSpeed()*0.6667);
     // Serial.printf("Pwr2: %i, Dir2: %i, ", m2.getPower(), m2.getDirection());
-    // Serial.printf("Pos: %i, RPM: %.2f, ", m1.getPosition(), m1.getSpeed()*0.6667);
-    
+    // Serial.printf("Pos1: %i, RPM1: %.2f, ", m1.getPosition(), m1.getSpeed()*0.6667);
     // IMU Data
     Serial.printf("ypr: %.4f, %.4f, %.4f, ", ypr[0]*180/M_PI, ypr[1]*180/M_PI, ypr[2]*180/M_PI);
-
-    // Serial.print("; areal: ");
-    // Serial.print(aaReal.x);
-    // Serial.print(", ");
-    // Serial.print(aaReal.y);
-    // Serial.print(", ");
-    // Serial.print(aaReal.z);
-
+    // Serial.printf("acc: %.4f, %.4f, %.4f, ", aaReal.x, aaReal.y, aaReal.z);
     // PID Data
-    Serial.printf("PID: %.4f, %.4f, %.4f, ", proportional, integral, derivative);
-
-    //Derivative
+    // Serial.printf("PID: %.4f, %.4f, %.4f, ", proportional, integral, derivative);
+    // RC Data
+    Serial.printf("rc: %i, %i, %i, %i, %i, %i, %i, ", rcAnalogs[0], rcAnalogs[1], rcAnalogs[2], rcAnalogs[3], ch3State, ch4State, ch7State);
     
-
     // New line
     Serial.println();
   }

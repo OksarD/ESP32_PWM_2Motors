@@ -7,7 +7,8 @@ MPU6050 mpu;
 
 #define INTERRUPT_PIN 23 
 #define LED_PIN 2
-#define DATA_PIN 21
+#define SDA 21
+#define SCL 22
 
 bool blinkState = false;
 
@@ -31,39 +32,20 @@ uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 uint8_t rcBuffer[9];   // RC storage buffer
 
-volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
-void dmpDataReady() {
-    mpuInterrupt = true;
-}
-
-void I2Csetup() {
-    // join I2C bus (I2Cdev library doesn't do this automatically:
-    Wire.begin();
-    Wire.setClock(400000); // 200kHz I2C clock.
-    Serial.begin(115200);
-    
-    // initialize serial communication
-    while (!Serial); // wait for enumeration, others continue immediately
-
-    // initialize device
-    Serial.println(F("Initializing I2C devices..."));
+void IMUinit() {
     mpu.initialize();
     pinMode(INTERRUPT_PIN, INPUT);
-
     // verify connection
     Serial.println(F("Testing device connections..."));
     Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
-
     // load and configure the DMP
     Serial.println(F("Initializing DMP..."));
     devStatus = mpu.dmpInitialize();
-
     // supply your own gyro offsets here, scaled for min sensitivity
     mpu.setXGyroOffset(220);
     mpu.setYGyroOffset(76);
     mpu.setZGyroOffset(-85);
     mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
-
     // make sure it worked (returns 0 if so)
     if (devStatus == 0) {
         // Calibration Time: generate offsets and calibrate our MPU6050
@@ -71,21 +53,12 @@ void I2Csetup() {
         mpu.CalibrateGyro(6);
         mpu.PrintActiveOffsets();
         // turn on the DMP, now that it's ready
-        delay(2000);
+        delay(1000);
         Serial.println(F("Enabling DMP..."));
         mpu.setDMPEnabled(true);
-
-        // enable Arduino interrupt detection
-        Serial.print(F("Enabling interrupt detection (Arduino external interrupt "));
-        Serial.print(digitalPinToInterrupt(INTERRUPT_PIN));
-        Serial.println(F(")..."));
-        attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
-        mpuIntStatus = mpu.getIntStatus();
-
         // set our DMP Ready flag so the main loop() function knows it's okay to use it
         Serial.println(F("DMP ready! Waiting for first interrupt..."));
         dmpReady = true;
-
         // get expected DMP packet size for later comparison
         packetSize = mpu.dmpGetFIFOPacketSize();
     } else {
@@ -97,24 +70,10 @@ void I2Csetup() {
         Serial.print(devStatus);
         Serial.println(F(")"));
     }
-
-    // configure LED for output
     pinMode(LED_PIN, OUTPUT);
 }
 
-void I2Cloop() {
-    Wire.requestFrom(0x60, 9);
-    for (byte i = 0; i < 9; i++) {
-        while(!Wire.available());
-        rcBuffer[i] = Wire.read();
-    }
-    for (byte i = 0; i < 4; i++) {
-        rcAnalogs[i] = rcBuffer[(2*i)-1] << 8 + rcBuffer[2*i];
-    }
-    ch3State = rcBuffer[9] & 0b0001;
-    ch4State = (rcBuffer[9] & 0b0010) >> 1;
-    ch7State = rcBuffer[9] >> 2;
-
+void IMUloop() {
     // if programming failed, don't try to do anything
     if (!dmpReady) return;
     // read a packet from FIFO
@@ -136,8 +95,29 @@ void I2Cloop() {
             mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
 
         #endif
+        Wire.flush();
         // blink LED to indicate activity
         blinkState = !blinkState;
         digitalWrite(LED_PIN, blinkState);
     }
 }
+
+void RCinit() {
+    pinMode(LED_PIN, OUTPUT);
+}
+
+void RCloop() {
+    Wire.requestFrom(0x60, 9);
+    while(Wire.available() < 9);
+    Wire.readBytes(rcBuffer, 9);
+    for (byte i = 0; i < 4; i++) {
+        rcAnalogs[i] = (rcBuffer[(2*i)+1] << 8) + rcBuffer[2*i];
+    }
+    ch3State = rcBuffer[8] & 0b0001;
+    ch4State = (rcBuffer[8] & 0b0010) >> 1;
+    ch7State = rcBuffer[8] >> 2;
+    blinkState = !blinkState;
+    digitalWrite(LED_PIN, blinkState);
+    Wire.flush();
+}
+

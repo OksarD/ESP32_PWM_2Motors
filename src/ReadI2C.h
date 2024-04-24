@@ -6,8 +6,10 @@
 #include "MPU6050_6Axis_MotionApps20.h"
 #include <Wire.h>
 
-void I2Csetup();
-void I2Cloop();
+void IMUinit();
+void IMUloop();
+void RCinit();
+void RCloop();
 
 extern Quaternion q;           // [w, x, y, z]         quaternion container
 extern VectorInt16 aa;         // [x, y, z]            accel sensor measurements
