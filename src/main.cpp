@@ -3,6 +3,9 @@
 #include <ReadI2C.h>
 #include <MotorPID.h>
 
+#define PROP_TUNING
+//#define INT_DERIV_TUNING
+
 // Macros
 #define SC_PIN_1 19
 #define PWR_PIN_1 26
@@ -14,6 +17,11 @@
 #define DIR_PIN_2 14
 #define BRK_PIN_2 27
 #define CHANNEL_2 1
+
+#define KP_MAX 20
+#define KI_MAX 0.02
+#define KD_MAX 10
+#define RC_BITS 10
 
 // Globals
 unsigned short loopCycles = 0;
@@ -33,9 +41,9 @@ float angle = 0;
 float proportional = 0;
 float integral = 0;
 float derivative = 0;
-float Kp = 10;
-float Ki = 0.03;
-float Kd = 20;
+float Kp = 0;
+float Ki = 0;
+float Kd = 0;
 
 // P algorithm for position
 int Pos[2] = {0,0};
@@ -58,7 +66,6 @@ void IRAM_ATTR ISR()
 
 // Prototypes
 void printData();
-void boolInvert(bool var);
 bool signToBool(int var);
 float inRange(float min_val, float var, float max_val);
 
@@ -66,8 +73,9 @@ float inRange(float min_val, float var, float max_val);
 void setup()
 {
   Wire.begin();
-  Wire.setClock(400000); // 200kHz I2C clock.
+  Wire.setClock(200000); // 100kHz I2C clock.
   Serial.begin(115200);
+  Wire.setTimeOut(100);
 
   // config for encoder motor
   m1.setupPins(SC_PIN_1, PWR_PIN_1, DIR_PIN_1, BRK_PIN_1);
@@ -86,9 +94,6 @@ void setup()
   Serial.println(F("Initializing I2C devices..."));
   while (!Serial);
 
-  // wait until character is sent before beginning loop
-  Serial.println(F("\nSend any character to begin."));
-
 }
 
 // Main Loop
@@ -96,6 +101,24 @@ void loop()
 {
   IMUloop();
   RCloop();
+
+  // Kill Switch
+  if(ch3State) {
+    digitalWrite(BRK_PIN_1, HIGH);
+    digitalWrite(BRK_PIN_2, HIGH);
+  }
+
+  // Tuning modes
+  #if defined(PROP_TUNING)
+    Kp = rcAnalogs[2] * KP_MAX / pow(2,RC_BITS) - 1;
+  #elif defined(INT_DERIV_TUNING) 
+    Ki = rcAnalogs[2] * KI_MAX / pow(2,RC_BITS) - 1;
+    Kd = rcAnalogs[3] * KD_MAX / pow(2,RC_BITS) - 1;
+  #else
+    Kp = 0;
+    Ki = 0;
+    Kd = 0;
+  #endif
 
   // P for target angle
   Pos[0] = m1.getPosition();
@@ -164,18 +187,14 @@ void printData()
     Serial.printf("ypr: %.4f, %.4f, %.4f, ", ypr[0]*180/M_PI, ypr[1]*180/M_PI, ypr[2]*180/M_PI);
     // Serial.printf("acc: %.4f, %.4f, %.4f, ", aaReal.x, aaReal.y, aaReal.z);
     // PID Data
-    // Serial.printf("PID: %.4f, %.4f, %.4f, ", proportional, integral, derivative);
+    Serial.printf("gain: %.4f, %.4f, %.4f, ", Kp, Ki, Kd);
+    Serial.printf("PID: %.4f, %.4f, %.4f, ", proportional, integral, derivative);
     // RC Data
-    Serial.printf("rc: %i, %i, %i, %i, %i, %i, %i, ", rcAnalogs[0], rcAnalogs[1], rcAnalogs[2], rcAnalogs[3], ch3State, ch4State, ch7State);
+    // Serial.printf("rc: %i, %i, %i, %i, %i, %i, %i, ", rcAnalogs[0], rcAnalogs[1], rcAnalogs[2], rcAnalogs[3], ch3State, ch4State, ch7State);
     
     // New line
     Serial.println();
   }
-}
-
-void boolInvert(bool var) {
-    if (var) var = 0;
-    else var = 1;
 }
 
 bool signToBool(int var) {

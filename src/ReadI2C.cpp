@@ -7,8 +7,6 @@ MPU6050 mpu;
 
 #define INTERRUPT_PIN 23 
 #define LED_PIN 2
-#define SDA 21
-#define SCL 22
 
 bool blinkState = false;
 
@@ -108,7 +106,7 @@ void RCinit() {
 
 void RCloop() {
     Wire.requestFrom(0x60, 9);
-    while(Wire.available() < 9);
+    while(!Wire.available());
     Wire.readBytes(rcBuffer, 9);
     for (byte i = 0; i < 4; i++) {
         rcAnalogs[i] = (rcBuffer[(2*i)+1] << 8) + rcBuffer[2*i];
