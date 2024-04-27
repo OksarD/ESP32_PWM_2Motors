@@ -210,9 +210,9 @@ void printData()
     // Main Loop Cycles
     // Serial.printf("c: %i, ", loopCycles);
     // Motor Data
-    Serial.printf("Pwr1: %i, Dir1: %i, ", m1.getPower(), m1.getDirection());
+    Serial.printf("Pwr1: %i, Dir1: %i, Brk1: %i ", m1.getPower(), m1.getDirection(), m1.getBrake());
     // Serial.printf("Pos1: %i, PCR1: %.2f, ", m1.getPosition(), m1.getPCR());
-    // Serial.printf("Pwr2: %i, Dir2: %i, ", m2.getPower(), m2.getDirection());
+    // Serial.printf("Pwr2: %i, Dir2: %i, Brk2: %i ", m2.getPower(), m2.getDirection(), m2.getBrake());
     // Serial.printf("Pos2: %i, PCR2: %.2f, ", m2.getPosition(), m2.getPCR());
     // IMU Data
     Serial.printf("roll: %.4f, spd: %.4f", ypr[2]*180/M_PI, IMUspeed);

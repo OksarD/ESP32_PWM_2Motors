@@ -33,8 +33,8 @@ void SpeedMotor::update() {
     }
     currentTime = esp_timer_get_time();
     powerChangeRate = 1e6*(power - prevPower)/(currentTime - prevTime);
-    short brakeThreshold = powerChangeRate * brakeTimeMultiplier;
-    if (power < brakeThreshold && power > -brakeThreshold) brake = 1;
+    unsigned short brakeThreshold = powerChangeRate * brakeTimeMultiplier;
+    if (power < brakeThreshold) brake = 1;
     else brake = 0;
     prevTime = currentTime;
     prevPower = power;
