@@ -34,7 +34,6 @@ unsigned short maxPower = pow(2,pwmResolution) - 1;
 unsigned long elapsedTime = 0;
 unsigned long prevTime = 0;
 
-float IMUspeed = 0;
 int controlOutput;
 unsigned int minPower = 0;
 bool killSwitchReleased = 1;
@@ -160,10 +159,13 @@ void loop()
   m1.update();
   m2.update();
   interrupts(); // resume interrupts
-  IMUspeed = aaReal.x*(elapsedTime - prevTime);
+  if (loopCycles % 50 == 0) {
+    elapsedTime = esp_timer_get_time();
+    
+  }
 
   // P for target angle
-  speedError = targetSpeed - IMUspeed;
+  //speedError = targetSpeed - <speed>;
   //targetAngle = speedKp * speedError;
 
   // PID for motor output
@@ -173,7 +175,6 @@ void loop()
   integral += Ki*error;
   integral = inRange(-maxPower, integral, maxPower);
   if (loopCycles % 50 == 0) {
-    elapsedTime = esp_timer_get_time();
     derivative = Kd*1e6*(error - prevError)/(elapsedTime - prevTime);
     // Serial.printf("DT: %i, DE: %.4f, ", elapsedTime - prevTime, error - prevError);
     prevTime = elapsedTime;
@@ -215,10 +216,9 @@ void printData()
     // Serial.printf("Pwr2: %i, Dir2: %i, Brk2: %i ", m2.getPower(), m2.getDirection(), m2.getBrake());
     // Serial.printf("Pos2: %i, PCR2: %.2f, ", m2.getPosition(), m2.getPCR());
     // IMU Data
-    Serial.printf("roll: %.4f, spd: %.4f", ypr[2]*180/M_PI, IMUspeed);
-    Serial.printf("acc: %.4f, %.4f, %.4f, ", aaReal.x, aaReal.y, aaReal.z);
+    Serial.printf("roll: %.4f, acc: %i, spd: %.4f, ", ypr[2]*180/M_PI, aaReal.y, IMUspeed);
     // PID Data
-    Serial.printf("gain: %.4f, %.4f, %.4f, ", Kp, Ki, Kd);
+    // Serial.printf("gain: %.4f, %.4f, %.4f, ", Kp, Ki, Kd);
     Serial.printf("PID: %.4f, %.4f, %.4f, ", proportional, integral, derivative);
     // RC Data
     // Serial.printf("rc: %i, %i, %i, %i, %i, %i, %i, ", rcAnalogs[0], rcAnalogs[1], rcAnalogs[2], rcAnalogs[3], ch3State, ch4State, ch7State);

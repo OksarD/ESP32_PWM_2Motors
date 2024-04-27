@@ -3,7 +3,7 @@
 MPU6050 mpu;
 
 #define OUTPUT_READABLE_YAWPITCHROLL
-//#define OUTPUT_READABLE_REALACCEL
+#define OUTPUT_READABLE_REALACCEL
 
 #define INTERRUPT_PIN 23 
 #define LED_PIN 2
@@ -87,9 +87,9 @@ void IMUloop() {
         #endif
         #ifdef OUTPUT_READABLE_REALACCEL
             // display real acceleration, adjusted to remove gravity
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
+            // mpu.dmpGetQuaternion(&q, fifoBuffer);
             mpu.dmpGetAccel(&aa, fifoBuffer);
-            mpu.dmpGetGravity(&gravity, &q);
+            //mpu.dmpGetGravity(&gravity, &q);
             mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
 
         #endif
