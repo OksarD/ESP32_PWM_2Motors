@@ -3,6 +3,12 @@
 
 #include <Arduino.h>
 
+#define ZERO_SPEED_TIMEOUT 0.1e6
+#define BRAKE_TIME_MULTIPLIER 0.01
+
+extern unsigned long elapsedTime;
+extern unsigned long prevTime;
+
 class SpeedMotor {
 public:
     void setupPins(byte sc_pin, byte pwr_pin, byte dir_pin, byte brake_pin);
@@ -13,9 +19,10 @@ public:
     volatile bool* getInterrupt();
     unsigned short getPower();
     bool getDirection();
-    int getPosition();
+    long getPosition();
     float getPCR();
     bool getBrake();
+    float getSpeed();
     void resetPosition();
     void setPower(unsigned int pwr);
     void setDirection(bool dir);
@@ -35,11 +42,10 @@ private:
     unsigned short prevPower = 0;
     float powerChangeRate = 0;
     bool direction = 0;
-    int position = 0;
-    unsigned long prevTime = 0;
-    unsigned long currentTime = 0;
     bool brake = 0;
-    float brakeTimeMultiplier = 0.01;
+    long position = 0;
+    float speed = 0;
+    hw_timer_t* scTimer = timerBegin(0, 80, true);
 };
 
 #endif //SPEEDMOTOR_H

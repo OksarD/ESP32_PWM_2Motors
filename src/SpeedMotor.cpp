@@ -1,5 +1,7 @@
 #include "SpeedMotor.h"
 
+unsigned long elapsedTime;
+unsigned long prevTime;
 
 // Configure Pins for Motor
 void SpeedMotor::setupPins(byte sc_pin, byte pwr_pin, byte dir_pin, byte brake_pin) {
@@ -10,8 +12,10 @@ void SpeedMotor::setupPins(byte sc_pin, byte pwr_pin, byte dir_pin, byte brake_p
     pinMode(scPin, INPUT);
     pinMode(dirPin, OUTPUT);
     pinMode(brakePin, OUTPUT);
+    timerAlarmWrite(scTimer, ZERO_SPEED_TIMEOUT, false);
+    timerAlarmEnable(scTimer);
 }
-    
+
 // Configure ESP32 PWM for Motor
 void SpeedMotor::setupPWM(unsigned int pwm_Freq, byte pwm_channel, byte pwm_resolution) {
     pwmFreq = pwm_Freq;
@@ -21,22 +25,21 @@ void SpeedMotor::setupPWM(unsigned int pwm_Freq, byte pwm_channel, byte pwm_reso
     ledcSetup(channel, pwmFreq, resolution);
 }
 
-// Update and Read Encoder States
+// Read Encoder States and Update Position, Speed and PCR
 void SpeedMotor::update() {
+    unsigned int t = timerRead(scTimer);
     if (scFlag) {
         scFlag = 0;
-        if (direction) {
-            position --;
-        } else {
-            position ++;
-        }
+        if (direction) position --;
+        else position ++;
+        speed = 1e6/t;
+        timerWrite(scTimer, 0);
     }
-    currentTime = esp_timer_get_time();
-    powerChangeRate = 1e6*(power - prevPower)/(currentTime - prevTime);
-    unsigned short brakeThreshold = powerChangeRate * brakeTimeMultiplier;
-    if (power < brakeThreshold) brake = 1;
+    if (t >= ZERO_SPEED_TIMEOUT) speed = 0;
+    // Calculate rate of change of power (PCR) applied for direction switch braking
+    powerChangeRate = 1e6*(power - prevPower)/(elapsedTime - prevTime);
+    if (power < powerChangeRate * BRAKE_TIME_MULTIPLIER) brake = 1;
     else brake = 0;
-    prevTime = currentTime;
     prevPower = power;
 }
 
@@ -60,7 +63,7 @@ byte SpeedMotor::getSC() {
     return scPin;
 }
 
-int SpeedMotor::getPosition() {
+long SpeedMotor::getPosition() {
     return position;
 }
 
@@ -74,6 +77,10 @@ bool SpeedMotor::getBrake() {
 
 float SpeedMotor::getPCR() {
     return powerChangeRate;
+}
+
+float SpeedMotor::getSpeed() {
+    return speed;
 }
 
 void SpeedMotor::resetPosition() {
