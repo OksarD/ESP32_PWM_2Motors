@@ -130,6 +130,7 @@ void loop()
     killSwitchReleased = 0;
     rampEnabled = 1;
     rampLevel = 0;
+    
   } else {
     if (!killSwitchReleased) {
       timerAlarmEnable(rampTimer);
