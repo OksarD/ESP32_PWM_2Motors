@@ -47,9 +47,9 @@ void IMUinit() {
     // make sure it worked (returns 0 if so)
     if (devStatus == 0) {
         // Calibration Time: generate offsets and calibrate our MPU6050
-        //mpu.CalibrateAccel(6);
-        //mpu.CalibrateGyro(6);
-        //mpu.PrintActiveOffsets();
+        // mpu.CalibrateAccel(6);
+        // mpu.CalibrateGyro(6);
+        // mpu.PrintActiveOffsets();
         // turn on the DMP, now that it's ready
         delay(1000);
         Serial.println(F("Enabling DMP..."));

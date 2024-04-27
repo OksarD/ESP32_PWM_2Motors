@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <SpeedMotor.h>
 #include <ReadI2C.h>
-#include <MotorPID.h>
 
 //#define PROP_ANGLE_TUNING
 #define INT_DERIV_TUNING
@@ -34,11 +33,14 @@ byte pwmResolution = 10;
 unsigned short maxPower = pow(2,pwmResolution) - 1;
 unsigned long elapsedTime = 0;
 unsigned long prevTime = 0;
-int motorPower;
+
+float IMUspeed = 0;
+int controlOutput;
 unsigned int minPower = 0;
 bool killSwitchReleased = 1;
 bool rampEnabled = 0;
 float rampLevel = 0;
+
 // PID values
 float targetAngle = TARG_OFFSET;
 float error = 0;
@@ -51,12 +53,10 @@ float Kp = 100;
 float Ki = 0;
 float Kd = 0;
 
-// P algorithm for position
-int Pos[2] = {0,0};
-int targetPos[2] = {0,0};
-int posError[2] = {0,0};
-int posProp[2] = {0,0};
-float PosKp = 0.05;
+// P algorithm for speed to determine target angle
+float targetSpeed = 0;
+float speedError = 0;
+float speedKp = 0.05;
 
 // Create encoder motor objects and map ISR array
 SpeedMotor m1;
@@ -112,7 +112,6 @@ void setup()
 
   Serial.println(F("Initializing I2C devices..."));
   while (!Serial);
-
 }
 
 // Main Loop
@@ -122,7 +121,6 @@ void loop()
   RCloop();
 
   // Kill Switch and Ramp Up
-  
   if(ch3State) {
     digitalWrite(BRK_PIN_1, HIGH);
     digitalWrite(BRK_PIN_2, HIGH);
@@ -146,6 +144,7 @@ void loop()
       else rampLevel = currentRampTime / RAMP_TIME;
     }
   }
+
   // Tuning modes
   #if defined(PROP_ANGLE_TUNING)
     Kp = rcAnalogs[2] * KP_MAX / (pow(2,RC_BITS) - 1);
@@ -156,21 +155,23 @@ void loop()
     Kd = rcAnalogs[3] * KD_MAX / (pow(2,RC_BITS) - 1);
   #endif
 
+  // read encoders and update position
+  noInterrupts(); //set interrupts aside
+  m1.update();
+  m2.update();
+  interrupts(); // resume interrupts
+  IMUspeed = aaReal.x*(elapsedTime - prevTime);
+
   // P for target angle
-  Pos[0] = m1.getPosition();
-  Pos[1] = m2.getPosition();
-  for (int i = 0; i < 2; i++) {
-    posError[i] = targetPos[i] - Pos[i];
-    posProp[i] = PosKp * posError[i];
-  }
-  //targetAngle = (posProp[0] + posProp[1])/2;
+  speedError = targetSpeed - IMUspeed;
+  //targetAngle = speedKp * speedError;
 
   // PID for motor output
   angle = -ypr[2]*180/PI;
   error = targetAngle - angle;
+  proportional = Kp*error;
   integral += Ki*error;
   integral = inRange(-maxPower, integral, maxPower);
-  proportional = Kp*error;
   if (loopCycles % 50 == 0) {
     elapsedTime = esp_timer_get_time();
     derivative = Kd*1e6*(error - prevError)/(elapsedTime - prevTime);
@@ -178,12 +179,12 @@ void loop()
     prevTime = elapsedTime;
     prevError = error;
   } 
-  motorPower = proportional + integral + derivative;
-  // motorPower = -maxPower*sin((2*PI*elapsedTime/(1e6*20)));
+  controlOutput = proportional + integral + derivative;
+  // controlOutput = -maxPower*sin((2*PI*elapsedTime/(1e6*20)));
 
   // Set power, including exclusion zone
-  unsigned int realPower = inRange(0, abs(motorPower), maxPower-minPower) + minPower;
-  bool dir = signToBool(motorPower);
+  unsigned int realPower = inRange(0, abs(controlOutput), maxPower-minPower) + minPower;
+  bool dir = signToBool(controlOutput);
   m1.setPower(realPower * rampLevel);
   m1.setDirection(dir);
   m2.setPower(realPower * rampLevel);
@@ -192,16 +193,10 @@ void loop()
   // Drive Motors
   ledcWrite(CHANNEL_1, m1.getPower());
   ledcWrite(CHANNEL_2, m2.getPower());
-  if (m1.getDirection()) digitalWrite(DIR_PIN_1, LOW);
-  else digitalWrite(DIR_PIN_1, HIGH);
-  if (m2.getDirection()) digitalWrite(DIR_PIN_2, HIGH);
-  else digitalWrite(DIR_PIN_2, LOW);
-
-  // read encoders and update position
-  noInterrupts(); //set interrupts aside
-  m1.update();
-  m2.update();
-  interrupts(); // resume interrupts
+  digitalWrite(DIR_PIN_1, !m1.getDirection());
+  digitalWrite(DIR_PIN_2, m2.getDirection());
+  digitalWrite(BRK_PIN_1, m1.getBrake());
+  digitalWrite(BRK_PIN_2, m2.getBrake());
 
   // print data every so often
   printData();
@@ -216,12 +211,12 @@ void printData()
     // Serial.printf("c: %i, ", loopCycles);
     // Motor Data
     Serial.printf("Pwr1: %i, Dir1: %i, ", m1.getPower(), m1.getDirection());
-    // Serial.printf("Pos2: %i, RPM2: %.2f, ", m2.getPosition(), m2.getSpeed()*0.6667);
+    // Serial.printf("Pos1: %i, PCR1: %.2f, ", m1.getPosition(), m1.getPCR());
     // Serial.printf("Pwr2: %i, Dir2: %i, ", m2.getPower(), m2.getDirection());
-    // Serial.printf("Pos1: %i, RPM1: %.2f, ", m1.getPosition(), m1.getSpeed()*0.6667);
+    // Serial.printf("Pos2: %i, PCR2: %.2f, ", m2.getPosition(), m2.getPCR());
     // IMU Data
-    Serial.printf("ypr: %.4f, %.4f, %.4f, ", ypr[0]*180/M_PI, ypr[1]*180/M_PI, ypr[2]*180/M_PI);
-    // Serial.printf("acc: %.4f, %.4f, %.4f, ", aaReal.x, aaReal.y, aaReal.z);
+    Serial.printf("roll: %.4f, spd: %.4f", ypr[2]*180/M_PI, IMUspeed);
+    Serial.printf("acc: %.4f, %.4f, %.4f, ", aaReal.x, aaReal.y, aaReal.z);
     // PID Data
     Serial.printf("gain: %.4f, %.4f, %.4f, ", Kp, Ki, Kd);
     Serial.printf("PID: %.4f, %.4f, %.4f, ", proportional, integral, derivative);

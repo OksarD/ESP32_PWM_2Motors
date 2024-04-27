@@ -14,9 +14,9 @@ public:
     unsigned short getPower();
     bool getDirection();
     int getPosition();
-    float getSpeed();
+    float getPCR();
+    bool getBrake();
     void resetPosition();
-
     void setPower(unsigned int pwr);
     void setDirection(bool dir);
 
@@ -32,11 +32,14 @@ private:
     volatile bool scFlag = 0;
     bool scState = 0;
     unsigned short power = 0;
+    unsigned short prevPower = 0;
+    float powerChangeRate = 0;
     bool direction = 0;
     int position = 0;
-    double speed = 0;
     unsigned long prevTime = 0;
     unsigned long currentTime = 0;
+    bool brake = 0;
+    float brakeTimeMultiplier = 0.01;
 };
 
 #endif //SPEEDMOTOR_H

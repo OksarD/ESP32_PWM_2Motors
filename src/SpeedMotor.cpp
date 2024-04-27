@@ -30,10 +30,14 @@ void SpeedMotor::update() {
         } else {
             position ++;
         }
-        currentTime = esp_timer_get_time();
-        speed = 1e6/(currentTime - prevTime);
-        prevTime = currentTime;
     }
+    currentTime = esp_timer_get_time();
+    powerChangeRate = 1e6*(power - prevPower)/(currentTime - prevTime);
+    short brakeThreshold = powerChangeRate * brakeTimeMultiplier;
+    if (power < brakeThreshold && power > -brakeThreshold) brake = 1;
+    else brake = 0;
+    prevTime = currentTime;
+    prevPower = power;
 }
 
 void SpeedMotor::setPower(unsigned int pwr) {
@@ -64,8 +68,12 @@ bool SpeedMotor::getDirection() {
     return direction;
 }
 
-float SpeedMotor::getSpeed() {
-    return speed;
+bool SpeedMotor::getBrake() {
+    return brake;
+}
+
+float SpeedMotor::getPCR() {
+    return powerChangeRate;
 }
 
 void SpeedMotor::resetPosition() {
