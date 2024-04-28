@@ -41,7 +41,7 @@ bool rampEnabled = 0;
 float rampLevel = 0;
 
 // PID values
-float targetAngle = TARG_OFFSET;
+float targetAngle = 0;
 float error = 0;
 float prevError = 0;
 float angle = 0;
@@ -176,10 +176,10 @@ void loop()
 
   // P for target angle
   speedError = targetSpeed - speed;
-  targetAngle = speedKp * speedError;
+  targetAngle = (speedKp * speedError);
 
   // PID for motor output
-  error = targetAngle - angle;
+  error = (targetAngle - angle) *180/M_PI;;
   proportional = Kp*error;
   integral += Ki*error;
   integral = inRange(-maxPower, integral, maxPower);
