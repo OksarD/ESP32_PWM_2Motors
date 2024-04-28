@@ -8,6 +8,7 @@
 
 extern unsigned long elapsedTime;
 extern unsigned long prevTime;
+extern unsigned short loopCycles;
 
 class SpeedMotor {
 public:
@@ -20,12 +21,13 @@ public:
     unsigned short getPower();
     bool getDirection();
     long getPosition();
-    float getPCR();
+    int getPCR();
     bool getBrake();
     float getSpeed();
     void resetPosition();
     void setPower(unsigned int pwr);
     void setDirection(bool dir);
+    void setBrake(bool brk);
 
 private:
 
@@ -38,9 +40,9 @@ private:
     byte enable;
     volatile bool scFlag = 0;
     bool scState = 0;
-    unsigned short power = 0;
-    unsigned short prevPower = 0;
-    float powerChangeRate = 0;
+    short power = 0;
+    short prevPower = 0;
+    int powerChangeRate = 0;
     bool direction = 0;
     bool brake = 0;
     long position = 0;
