@@ -34,7 +34,7 @@ void SpeedMotor::setupPWM(unsigned int pwm_Freq, byte pwm_channel, byte pwm_reso
 // Read Encoder States and Update Position, Speed and PCR
 void SpeedMotor::update() {
     unsigned int t = timerRead(scTimer);
-    if (scFlag) {
+    if (scFlag && !brake) {
         scFlag = 0;
         if (direction) position --;
         else position ++;
