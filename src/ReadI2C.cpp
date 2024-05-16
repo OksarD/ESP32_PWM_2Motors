@@ -29,6 +29,11 @@ uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
 uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 uint8_t rcBuffer[9];   // RC storage buffer
+bool IMUdataFlag = 0;
+
+void IRAM_ATTR IMU_ISR() {
+    IMUdataFlag = 1;
+}
 
 void IMUinit() {
     mpu.initialize();
@@ -39,6 +44,7 @@ void IMUinit() {
     // load and configure the DMP
     Serial.println(F("Initializing DMP..."));
     devStatus = mpu.dmpInitialize();
+    attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), IMU_ISR, RISING);
     // supply your own gyro offsets here, scaled for min sensitivity
     mpu.setXGyroOffset(83);
     mpu.setYGyroOffset(-71);
@@ -75,7 +81,9 @@ void IMUloop() {
     // if programming failed, don't try to do anything
     if (!dmpReady) return;
     // read a packet from FIFO
-    if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
+    if (IMUdataFlag) {
+        IMUdataFlag = 0;
+        if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
 
         #ifdef OUTPUT_READABLE_YAWPITCHROLL
             // display Euler angles in degrees
@@ -92,6 +100,10 @@ void IMUloop() {
         blinkState = !blinkState;
         digitalWrite(LED_PIN, blinkState);
     }
+    } else {
+        //Serial.print("No IMU data!");
+    }
+    
 }
 
 void RCinit() {
@@ -99,17 +111,19 @@ void RCinit() {
 }
 
 void RCloop() {
+    Wire.flush();
     Wire.requestFrom(0x60, 9);
-    while(!Wire.available());
-    Wire.readBytes(rcBuffer, 9);
-    for (byte i = 0; i < 4; i++) {
-        rcAnalogs[i] = (rcBuffer[(2*i)+1] << 8) + rcBuffer[2*i];
+    if(Wire.available()) {
+            Wire.readBytes(rcBuffer, 9);
+        for (byte i = 0; i < 4; i++) {
+            rcAnalogs[i] = (rcBuffer[(2*i)+1] << 8) + rcBuffer[2*i];
+        }
+        ch3State = rcBuffer[8] & 0b0001;
+        ch4State = (rcBuffer[8] & 0b0010) >> 1;
+        ch7State = rcBuffer[8] >> 2;
+        blinkState = !blinkState;
+        digitalWrite(LED_PIN, blinkState);
     }
-    ch3State = rcBuffer[8] & 0b0001;
-    ch4State = (rcBuffer[8] & 0b0010) >> 1;
-    ch7State = rcBuffer[8] >> 2;
-    blinkState = !blinkState;
-    digitalWrite(LED_PIN, blinkState);
     Wire.flush();
 }
 

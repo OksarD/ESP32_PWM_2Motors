@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 #define ZERO_SPEED_TIMEOUT 0.1e6
-#define BRAKE_TIME_MULTIPLIER 0.01
+#define BRAKE_TIME_MULTIPLIER 0.05
 
 extern unsigned long elapsedTime;
 extern unsigned long prevTime;

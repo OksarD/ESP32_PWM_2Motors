@@ -4,6 +4,11 @@ unsigned long elapsedTime = 0;
 unsigned long prevTime = 0;
 unsigned short loopCycles = 0;
 
+bool signToBool(int var) {
+  if (var < 0) return 1;
+  else return 0;
+}
+
 // Configure Pins for Motor
 void SpeedMotor::setupPins(byte sc_pin, byte pwr_pin, byte dir_pin, byte brake_pin) {
     scPin = sc_pin;
@@ -38,13 +43,15 @@ void SpeedMotor::update() {
     }
     if (t >= ZERO_SPEED_TIMEOUT) speed = 0;
     // Calculate rate of change of power (PCR) applied for direction switch braking
-    if (loopCycles % 500 == 0) {
+    if (loopCycles % 50 == 0) {
         powerChangeRate = 1e6*abs((power - prevPower))/(elapsedTime - prevTime);
-        prevPower = power;
     }
-    if (abs(power) < abs(powerChangeRate) * BRAKE_TIME_MULTIPLIER && prevPower != power) {
+    if ((abs(power) < abs(powerChangeRate) * BRAKE_TIME_MULTIPLIER) && abs(prevPower) > abs(power)) {
         brake = 1;
-    } else brake = 0;
+    } if (abs(prevPower) < abs(power)) {
+        brake = 0;
+    }
+    if (loopCycles % 50 == 0) prevPower = power;
 }
 
 void SpeedMotor::setPower(unsigned int pwr) {

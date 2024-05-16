@@ -3,7 +3,7 @@
 #include <ReadI2C.h>
 
 //#define PROP_ANGLE_TUNING
-//#define INT_DERIV_TUNING
+#define INT_DERIV_TUNING
 
 // Macros
 #define SC_PIN_1 19
@@ -21,7 +21,10 @@
 #define KP_MAX 300
 #define KI_MAX 1
 #define KD_MAX 10
+
 #define RC_BITS 10
+#define THROTTLE_GAIN 0.0001
+#define STEERING_GAIN 0.005
 
 #define TARG_OFFSET 0.08
 #define RAMP_TIME 3e6
@@ -49,7 +52,7 @@ float prevAngle;
 float proportional = 0;
 float integral = 0;
 float derivative = 0;
-float Kp = 100;
+float Kp = 70;
 float Ki = 0;
 float Kd = 0;
 
@@ -154,9 +157,9 @@ void loop()
   // P for target angle
   speedError = targetSpeed - speed;
   //targetAngle = (speedKp * speedError);
-  targetAngle = 0;
+  targetAngle = rcAnalogs[1] * THROTTLE_GAIN;
   // PID for motor output
-  error = (targetAngle - angle) *180/M_PI;;
+  error = (targetAngle - angle) *180/M_PI;
   proportional = Kp*error;
   integral += Ki*error;
   integral = inRange(-maxPower, integral, maxPower);
@@ -178,6 +181,7 @@ void loop()
     if (!killSwitchReleased) {
       rampTime = elapsedTime;
       killSwitchReleased = 1;
+      integral = 0;
     }
     if (rampEnabled) {
       if(elapsedTime - rampTime >= RAMP_TIME) {
@@ -204,6 +208,7 @@ void loop()
   digitalWrite(BRK_PIN_2, m2.getBrake());
 
   // print data every so often
+  loopCycles++;
   printData();
 }
 
@@ -215,8 +220,8 @@ void printData()
     // Serial.printf("c: %i, ", loopCycles);
     // Motor Data
     Serial.printf("Pwr1: %i, Dir1: %i, Brk1: %i ", m1.getPower(), m1.getDirection(), m1.getBrake());
-    Serial.printf("Pos1: %i, PCR1: %i, ", m1.getPosition(), m1.getPCR());
-    // Serial.printf("Pwr2: %i, Dir2: %i, Brk2: %i ", m2.getPower(), m2.getDirection(), m2.getBrake());
+    // Serial.printf("Pos1: %i, PCR1: %i, ", m1.getPosition(), m1.getPCR());
+    Serial.printf("Pwr2: %i, Dir2: %i, Brk2: %i ", m2.getPower(), m2.getDirection(), m2.getBrake());
     // Serial.printf("Pos2: %i, PCR2: %.2f, ", m2.getPosition(), m2.getPCR());
     // IMU Data
     // Serial.printf("roll: %.4f, linSpd: %.4f angVel: %.4f, spd %.4f, ", ypr[2]*180/M_PI, linearWheelSpeed ,angularVelocity, speed);
@@ -226,16 +231,11 @@ void printData()
     // RC Data
     // Serial.printf("rc: %i, %i, %i, %i, %i, %i, %i, ", rcAnalogs[0], rcAnalogs[1], rcAnalogs[2], rcAnalogs[3], ch3State, ch4State, ch7State);
     // Other Data
-    // Serial.printf("targ: %.4f, ", targetAngle);
+    Serial.printf("targ: %.4f, ", targetAngle *180/M_PI);
     // Serial.printf("ramp: %.4f", rampLevel) ;
     // New line
     Serial.println();
   }
-}
-
-bool signToBool(int var) {
-  if (var < 0) return 1;
-  else return 0;
 }
 
 float inRange(float min_val, float var, float max_val) {
