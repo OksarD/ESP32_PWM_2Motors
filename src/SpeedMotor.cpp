@@ -44,11 +44,11 @@ void SpeedMotor::update() {
     if (t >= ZERO_SPEED_TIMEOUT) speed = 0;
     // Calculate rate of change of power (PCR) applied for direction switch braking
     if (loopCycles % 50 == 0) {
-        powerChangeRate = 1e6*abs((power - prevPower))/(elapsedTime - prevTime);
+        powerChangeRate = 1e6*(power - prevPower)/(elapsedTime - prevTime);
     }
-    if ((abs(power) < abs(powerChangeRate) * BRAKE_TIME_MULTIPLIER) && abs(prevPower) > abs(power)) {
+    if ((power < powerChangeRate * BRAKE_TIME_MULTIPLIER) && prevPower > power) {
         brake = 1;
-    } if (abs(prevPower) < abs(power)) {
+    } if (prevPower < power) {
         brake = 0;
     }
     if (loopCycles % 50 == 0) prevPower = power;

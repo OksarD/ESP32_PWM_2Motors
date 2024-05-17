@@ -5,9 +5,10 @@
 //#define PROP_TUNING
 //#define INT_TUNING
 //#define DERIV_TUNING
-#define POS_PROP_TUNING
+//#define POS_PROP_TUNING
 //#define MIN_POW_TUNING
-
+#define THROTTLE_TUNING
+//#define TCR_TUNING
 // Macros
 #define SC_PIN_1 19
 #define PWR_PIN_1 26
@@ -20,15 +21,16 @@
 #define BRK_PIN_2 27
 #define CHANNEL_2 1
 
-#define ANGLE_MAX 4 * (M_PI/180)
+#define ANGLE_MAX 4
 #define KP_MAX 300
 #define KI_MAX 1
 #define KD_MAX 10
 #define MIN_POW_MAX 50
 #define POS_KP_MAX 1
+#define TCR_MAX 0.5
+#define THROTTLE_GAIN_MAX 0.004
 
 #define RC_BITS 10
-#define THROTTLE_GAIN 0.0001
 #define STEERING_GAIN 0.005
 
 #define TARG_OFFSET 0
@@ -70,6 +72,9 @@ unsigned int posNum = 0;
 // RC control vars
 float throttle;
 float prevThrottle;
+float throttleGain = 0;
+float steeringGain = 0;
+float maxTCR = 0;
 
 // Create encoder motor objects and map ISR array
 SpeedMotor m1;
@@ -87,8 +92,6 @@ void printData();
 bool signToBool(int var);
 float inRange(float min_val, float var, float max_val);
 
-hw_timer_t* rampTimer = timerBegin(0, 80, true);
-
 // Main Setup
 void setup()
 {
@@ -96,9 +99,6 @@ void setup()
   Wire.setClock(200000); // 100kHz I2C clock.
   Serial.begin(115200);
   Wire.setTimeOut(100);
-
-  // Ramp Up timer
-  //timerAlarmWrite(rampTimer, RAMP_TIME, true);
 
   // config for motors
   m1.setupPins(SC_PIN_1, PWR_PIN_1, DIR_PIN_1, BRK_PIN_1);
@@ -147,6 +147,10 @@ void loop()
     posKp = 0;
   #elif defined(POS_PROP_TUNING)
     posKp = rcAnalogs[2] * POS_KP_MAX / (pow(2,RC_BITS) - 1);
+  #elif defined(THROTTLE_TUNING)
+    throttleGain = rcAnalogs[2] * THROTTLE_GAIN_MAX / (pow(2,RC_BITS) - 1);
+  #elif defined(TCR_TUNING)
+    maxTCR = rcAnalogs[2] * TCR_MAX / (pow(2,RC_BITS) - 1);
   #endif
   // Angle Tuning
   if (ch7State == 1) calibrationOffset = (rcAnalogs[3] - 512) * ANGLE_MAX / (pow(2,RC_BITS) - 1);
@@ -160,25 +164,34 @@ void loop()
   m2.update();
   interrupts(); // resume interrupts
 
+  // Throttle Control
+  throttle = rcAnalogs[1] * throttleGain;
+  float throttleChangeRate = 1e6*(throttle - prevThrottle)/(elapsedTime - prevTime);
+  if (throttleChangeRate > maxTCR) {
+    throttle = prevThrottle + throttleChangeRate * deltaTime;
+  }
+
   // P for target angle
+  /*
   float posProp = 0;
-  // position = (m1.getPosition() + m2.getPosition()) * 0.5;
-  // if (posNum < 100) {
-  //   tempAvPos += position;
-  //   posNum ++;
-  // } else if (posNum == 100) {
-  //   tempAvPos /= 100;
-  //   averagePos = tempAvPos;
-  //   tempAvPos = 0;
-  //   posNum = 0;
+  position = (m1.getPosition() + m2.getPosition()) * 0.5;
+  if (posNum < 100) {
+    tempAvPos += position;
+    posNum ++;
+  } else if (posNum == 100) {
+    tempAvPos /= 100;
+    averagePos = tempAvPos;
+    tempAvPos = 0;
+    posNum = 0;
 
-  //   posProp = averagePos * posKp;
-  // }
-  
-  targetAngle = calibrationOffset + posProp;
+    posProp = averagePos * posKp;
+  }
+  */
 
+  targetAngle = calibrationOffset + throttle; // + posProp;
+  angle = ypr[2]*180/M_PI;
   // PID for motor output
-  error = (targetAngle - angle) *180/M_PI;
+  error = targetAngle - angle; // convert to degree
   proportional = Kp*error;
   integral += Ki*error;
   integral = inRange(-maxPower, integral, maxPower);
@@ -213,7 +226,7 @@ void loop()
   }
 
   // Set power and direction
-  unsigned int realPower = inRange(-maxPower, abs(controlOutput), maxPower) + MIN_POWER;
+  unsigned int realPower = inRange(0, abs(controlOutput), maxPower) + MIN_POWER;
   bool dir = signToBool(controlOutput);
   #if defined(MIN_POW_TUNING)
     int minPowTest = rcAnalogs[2] * MIN_POW_MAX / (pow(2,RC_BITS) - 1);
@@ -248,8 +261,8 @@ void printData()
     // Main Loop Cycles
     // Serial.printf("c: %i, ", loopCycles);
     // Motor Data
-    //Serial.printf("Pwr1: %i, Dir1: %i, Brk1: %i ", m1.getPower(), m1.getDirection(), m1.getBrake());
-    Serial.printf("Pos1: %i, PCR1: %i, ", m1.getPosition(), m1.getPCR());
+    Serial.printf("Pwr1: %i, Dir1: %i, Brk1: %i ", m1.getPower(), m1.getDirection(), m1.getBrake());
+    // Serial.printf("Pos1: %i, PCR1: %i, ", m1.getPosition(), m1.getPCR());
     //Serial.printf("Pwr2: %i, Dir2: %i, Brk2: %i ", m2.getPower(), m2.getDirection(), m2.getBrake());
     // Serial.printf("Pos2: %i, PCR2: %.2f, ", m2.getPosition(), m2.getPCR());
     // IMU Data
@@ -257,13 +270,14 @@ void printData()
     //Serial.printf("roll: %.4f, linSpd: %.4f angVel: %.4f, spd %.4f, ", ypr[2]*180/M_PI, linearWheelSpeed ,angularVelocity, speed);
     // PID Data
     //Serial.printf("gain: %.4f, %.4f, %.4f, ", Kp, Ki, Kd);
-    Serial.printf("PID: %.4f, %.4f, %.4f, ", proportional, integral, derivative);
+    //Serial.printf("PID: %.4f, %.4f, %.4f, ", proportional, integral, derivative);
     // RC Data
     // Serial.printf("rc: %i, %i, %i, %i, %i, %i, %i, ", rcAnalogs[0], rcAnalogs[1], rcAnalogs[2], rcAnalogs[3], ch3State, ch4State, ch7State);
     // Other Data
     Serial.printf("targ: %.4f, ", targetAngle *180/M_PI);
-    //Serial.printf("minPwr: %i, pwr: %i, ", m1.getPower(), controlOutput);
-    Serial.printf("avPos: %i, posKp: %.4f, ", averagePos, posKp);
+    //Serial.printf("minPwr: %i, ", m1.getPower());
+    // Serial.printf("avPos: %i, posKp: %.4f, ", averagePos, posKp);
+    Serial.printf("thrGain: %.4f, maxTCR: %.4f, ", throttleGain, maxTCR);
     // Serial.printf("ramp: %.4f", rampLevel) ;
     // New line
     Serial.println();
