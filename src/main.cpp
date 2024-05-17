@@ -8,7 +8,9 @@
 //#define POS_PROP_TUNING
 //#define MIN_POW_TUNING
 #define THROTTLE_TUNING
+//#define STEER_TUNING
 //#define TCR_TUNING
+
 // Macros
 #define SC_PIN_1 19
 #define PWR_PIN_1 26
@@ -27,17 +29,16 @@
 #define KD_MAX 10
 #define MIN_POW_MAX 50
 #define POS_KP_MAX 1
-#define TCR_MAX 0.5
-#define THROTTLE_GAIN_MAX 0.004
+#define TCR_MAX 0.000005
+#define THROTTLE_GAIN_MAX 0.02
+#define STEERING_GAIN_MAX 0.5
 
 #define RC_BITS 10
-#define STEERING_GAIN 0.005
-
 #define TARG_OFFSET 0
 #define RAMP_TIME 3e6
 #define PULSES_PER_REV 90
 #define WHEEL_DIAMATER 0.216
-#define MIN_POWER 20
+#define MIN_POWER 1
 
 // Globals
 unsigned int pwmFreq = 5000;
@@ -58,9 +59,9 @@ float prevAngle;
 float proportional = 0;
 float integral = 0;
 float derivative = 0;
-float Kp = 65;
-float Ki = 0.140;
-float Kd = 0.6;
+float Kp = 50;
+float Ki = 0.11;
+float Kd = 0.45;
 float posKp = 0;
 
 // P algorithm for speed to determine target angle
@@ -70,11 +71,15 @@ int averagePos = 0;
 unsigned int posNum = 0;
 
 // RC control vars
-float throttle;
-float prevThrottle;
+float throttle = 0;
+float steering = 0;
+float prevThrottle = 0;
 float throttleGain = 0;
-float steeringGain = 0;
-float maxTCR = 0;
+float steeringGain = 0.2;
+double maxTCR = 0;
+float throttleChangeRate = 0;
+float throttleOutput = 0;
+float calibrationOffset = 0;
 
 // Create encoder motor objects and map ISR array
 SpeedMotor m1;
@@ -133,7 +138,6 @@ void loop()
   RCloop();
 
   // Tuning modes
-  float calibrationOffset;
   #if defined(PROP_TUNING)
     Kp = rcAnalogs[2] * KP_MAX / (pow(2,RC_BITS) - 1);  
   #elif defined(INT_TUNING) 
@@ -151,10 +155,9 @@ void loop()
     throttleGain = rcAnalogs[2] * THROTTLE_GAIN_MAX / (pow(2,RC_BITS) - 1);
   #elif defined(TCR_TUNING)
     maxTCR = rcAnalogs[2] * TCR_MAX / (pow(2,RC_BITS) - 1);
+  #elif defined(STEER_TUNING)
+    steeringGain = rcAnalogs[2] * STEERING_GAIN_MAX / (pow(2,RC_BITS) - 1);
   #endif
-  // Angle Tuning
-  if (ch7State == 1) calibrationOffset = (rcAnalogs[3] - 512) * ANGLE_MAX / (pow(2,RC_BITS) - 1);
-  else targetAngle = TARG_OFFSET;
 
   // read encoders and update position
   elapsedTime = esp_timer_get_time();
@@ -166,10 +169,22 @@ void loop()
 
   // Throttle Control
   throttle = rcAnalogs[1] * throttleGain;
-  float throttleChangeRate = 1e6*(throttle - prevThrottle)/(elapsedTime - prevTime);
-  if (throttleChangeRate > maxTCR) {
-    throttle = prevThrottle + throttleChangeRate * deltaTime;
+  steering = rcAnalogs[0] * steeringGain;
+
+  // middle switch states
+  if (ch7State == 0) {
+    calibrationOffset = (rcAnalogs[3] - 512) * ANGLE_MAX / (pow(2,RC_BITS) - 1);
+    throttle = 0;
+    steering = 0;
   }
+
+    // throttleChangeRate = throttle - prevThrottle;
+    // if (throttleChangeRate > maxTCR) {
+    //   throttleOutput = prevThrottle + maxTCR;
+    // } else if (throttleChangeRate < -maxTCR) {
+    //   throttleOutput = prevThrottle - maxTCR;
+    // }
+    // prevThrottle = throttle;
 
   // P for target angle
   /*
@@ -188,8 +203,10 @@ void loop()
   }
   */
 
+  // get target and current angle in degrees
   targetAngle = calibrationOffset + throttle; // + posProp;
-  angle = ypr[2]*180/M_PI;
+  angle = -ypr[2]*180/M_PI;
+
   // PID for motor output
   error = targetAngle - angle; // convert to degree
   proportional = Kp*error;
@@ -201,6 +218,8 @@ void loop()
     prevError = error;
   } 
   controlOutput = proportional + integral + derivative;
+  short Output1 = controlOutput + steering;
+  short Output2 = controlOutput - steering;
 
   // Kill Switch and Power Ramp Up Logic
   if(ch3State) {
@@ -226,18 +245,20 @@ void loop()
   }
 
   // Set power and direction
-  unsigned int realPower = inRange(0, abs(controlOutput), maxPower) + MIN_POWER;
-  bool dir = signToBool(controlOutput);
+  unsigned int realPower1 = inRange(0, abs(Output1), maxPower) + MIN_POWER;
+  unsigned int realPower2 = inRange(0, abs(Output2), maxPower) + MIN_POWER;
+  bool dir1 = signToBool(Output1);
+  bool dir2 = signToBool(Output2);
   #if defined(MIN_POW_TUNING)
     int minPowTest = rcAnalogs[2] * MIN_POW_MAX / (pow(2,RC_BITS) - 1);
     m1.setPower((minPowTest) * rampLevel);
     m2.setPower((minPowTest) * rampLevel);
   #else
-    m1.setPower((realPower) * rampLevel);
-    m2.setPower((realPower) * rampLevel);
+    m1.setPower((realPower1) * rampLevel);
+    m2.setPower((realPower2) * rampLevel);
   #endif
-  m1.setDirection(dir);
-  m2.setDirection(dir);
+  m1.setDirection(dir1);
+  m2.setDirection(dir2);
 
 
 
@@ -262,8 +283,8 @@ void printData()
     // Serial.printf("c: %i, ", loopCycles);
     // Motor Data
     Serial.printf("Pwr1: %i, Dir1: %i, Brk1: %i ", m1.getPower(), m1.getDirection(), m1.getBrake());
-    // Serial.printf("Pos1: %i, PCR1: %i, ", m1.getPosition(), m1.getPCR());
-    //Serial.printf("Pwr2: %i, Dir2: %i, Brk2: %i ", m2.getPower(), m2.getDirection(), m2.getBrake());
+    //Serial.printf("Pos1: %i, PCR1: %i, ", m1.getPosition(), m1.getPCR());
+    Serial.printf("Pwr2: %i, Dir2: %i, Brk2: %i ", m2.getPower(), m2.getDirection(), m2.getBrake());
     // Serial.printf("Pos2: %i, PCR2: %.2f, ", m2.getPosition(), m2.getPCR());
     // IMU Data
     //Serial.printf("roll: %.4f, " ,ypr[2]*180/M_PI);
@@ -274,10 +295,10 @@ void printData()
     // RC Data
     // Serial.printf("rc: %i, %i, %i, %i, %i, %i, %i, ", rcAnalogs[0], rcAnalogs[1], rcAnalogs[2], rcAnalogs[3], ch3State, ch4State, ch7State);
     // Other Data
-    Serial.printf("targ: %.4f, ", targetAngle *180/M_PI);
+    Serial.printf("targ: %.4f, ", targetAngle);
     //Serial.printf("minPwr: %i, ", m1.getPower());
     // Serial.printf("avPos: %i, posKp: %.4f, ", averagePos, posKp);
-    Serial.printf("thrGain: %.4f, maxTCR: %.4f, ", throttleGain, maxTCR);
+    Serial.printf("thrGain: %.6f, strGain: %.6f, thr: %.4f, str: %.4f, ", throttleGain, steeringGain, throttle, steering);
     // Serial.printf("ramp: %.4f", rampLevel) ;
     // New line
     Serial.println();
