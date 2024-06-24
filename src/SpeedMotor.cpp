@@ -10,11 +10,8 @@ bool signToBool(int var) {
 }
 
 // Configure Pins for Motor
-void SpeedMotor::setupPins(byte sc_pin, byte pwr_pin, byte dir_pin, byte brake_pin) {
-    scPin = sc_pin;
+void SpeedMotor::setupPins(byte pwr_pin) {
     enable = pwr_pin;
-    dirPin = dir_pin;
-    brakePin = brake_pin;
     pinMode(scPin, INPUT);
     pinMode(dirPin, OUTPUT);
     pinMode(brakePin, OUTPUT);
@@ -42,16 +39,6 @@ void SpeedMotor::update() {
         timerWrite(scTimer, 0);
     }
     if (t >= ZERO_SPEED_TIMEOUT) speed = 0;
-    // Calculate rate of change of power (PCR) applied for direction switch braking
-    if (loopCycles % 50 == 0) {
-        powerChangeRate = 1e6*(power - prevPower)/(elapsedTime - prevTime);
-    }
-    if ((power < powerChangeRate * BRAKE_TIME_MULTIPLIER) && prevPower > power) {
-        brake = 1;
-    } if (prevPower < power) {
-        brake = 0;
-    }
-    if (loopCycles % 50 == 0) prevPower = power;
 }
 
 void SpeedMotor::setPower(unsigned int pwr) {

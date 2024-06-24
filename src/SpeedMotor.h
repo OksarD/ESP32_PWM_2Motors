@@ -12,7 +12,7 @@ extern unsigned short loopCycles;
 
 class SpeedMotor {
 public:
-    void setupPins(byte sc_pin, byte pwr_pin, byte dir_pin, byte brake_pin);
+    void setupPins(byte pwr_pin);
     void setupPWM(unsigned int pwm_Freq, byte pwm_channel, byte pwm_resolution);
     void update();
 
