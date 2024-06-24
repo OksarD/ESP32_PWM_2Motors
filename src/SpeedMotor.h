@@ -18,14 +18,14 @@ public:
 
     byte getSC();
     volatile bool* getInterrupt();
-    unsigned short getPower();
+    int getPower();
     bool getDirection();
     long getPosition();
     int getPCR();
     bool getBrake();
     float getSpeed();
     void resetPosition();
-    void setPower(unsigned int pwr);
+    void setPower(int pwr);
     void setDirection(bool dir);
     void setBrake(bool brk);
 
@@ -40,7 +40,7 @@ private:
     byte enable;
     volatile bool scFlag = 0;
     bool scState = 0;
-    short power = 0;
+    int power = 0;
     short prevPower = 0;
     int powerChangeRate = 0;
     bool direction = 0;

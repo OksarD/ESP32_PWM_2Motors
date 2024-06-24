@@ -2,7 +2,8 @@
 #include <SpeedMotor.h>
 #include <ReadI2C.h>
 #include <ODriveArduino.h>
-#include <SoftwareSerial.h>
+//#include <SoftwareSerial.h>
+//#include <HardwareSerial.h>
 
 //#define PROP_TUNING
 //#define INT_TUNING
@@ -22,6 +23,7 @@
 
 #define ODRIVE_UART_TX 26
 #define ODRIVE_UART_RX 27
+#define ODRIVE_MAX_VELOCITY 8
 
 #define ANGLE_MAX 4
 #define KP_MAX 300
@@ -40,16 +42,20 @@
 #define WHEEL_DIAMATER 0.216
 #define MIN_POWER 1
 
+
 // Globals
 unsigned int pwmFreq = 5000;
 byte pwmResolution = 10;
 unsigned short maxPower = pow(2,pwmResolution);
+float powerToVelocity = ODRIVE_MAX_VELOCITY/maxPower;
 int controlOutput;
 bool killSwitchReleased = 1;
 unsigned long rampTime = 0;
 bool rampEnabled = 0;
 float rampLevel = 0;
-
+float m1Vel;
+float m2Vel;
+bool running = 0;
 // PID values
 float targetAngle = 0;
 float error = 0;
@@ -101,7 +107,7 @@ float inRange(float min_val, float var, float max_val);
 template<class T> inline Print& operator <<(Print &obj,     T arg) { obj.print(arg);    return obj; }
 template<>        inline Print& operator <<(Print &obj, float arg) { obj.print(arg, 4); return obj; }
 
-SoftwareSerial odrive_serial(27,26);
+HardwareSerial odrive_serial(Serial1);
 ODriveArduino odrive(odrive_serial);
 
 // Main Setup
@@ -111,18 +117,13 @@ void setup()
   Wire.setClock(200000); // 100kHz I2C clock.
   Serial.begin(115200);
   Wire.setTimeOut(100);
-  odrive_serial.begin(115200);
-  //odrive_serial.begin(115200, SERIAL_8N1, ODRIVE_UART_TX, ODRIVE_UART_RX);
+  odrive_serial.begin(115200, SERIAL_8N1, ODRIVE_UART_RX, ODRIVE_UART_TX);
 
   // config for motors
   m1.setupPins(PWR_PIN_1);
   m1.setupPWM(pwmFreq,CHANNEL_1,pwmResolution);
   m1.setupPins(PWR_PIN_2);
   m1.setupPWM(pwmFreq,CHANNEL_2,pwmResolution);
-  
-  // kill motors
-  ledcWrite(CHANNEL_1, 512);
-  ledcWrite(CHANNEL_2, 512);
 
   // encoder interrupt setup
   attachInterrupt(digitalPinToInterrupt(m1.getSC()), ISR<0>, CHANGE);
@@ -137,76 +138,49 @@ void setup()
   while(!odrive_serial);
   Serial.println("Serial1 Ready...");
 
-  //ODrive serial setup
+  //ODrive serial and paramater setup
   Serial.println("ODriveArduino");
   Serial.println("Setting parameters...");
-  // In this example we set the same parameters to both motors.
-  // You can of course set them different if you want.
-  // See the documentation or play around in odrivetool to see the available parameters
   for (int axis = 0; axis < 2; ++axis) {
-    odrive_serial << "w axis" << axis << ".controller.config.vel_limit " << 10.0f << '\n';
+    odrive_serial << "w axis" << axis << ".controller.config.vel_limit " << 0.8f << '\n';
     odrive_serial << "w axis" << axis << ".motor.config.current_lim " << 25.0f << '\n';
-    // This ends up writing something like "w axis0.motor.config.current_lim 10.0\n"
+    //odrive.run_state(axis, ODriveArduino::AXIS_STATE_CLOSED_LOOP_CONTROL, false); // don't wait
   }
 }
 
 // Main Loop
 void loop() {
 
-  if (Serial.available()) {
-    char c = Serial.read();
-
-    // Run calibration sequence
-    /* if (c == '0' || c == '1') {
-      int motornum = c-'0';
-      int requested_state;
-
-      requested_state = ODriveArduino::AXIS_STATE_MOTOR_CALIBRATION;
-      Serial << "Axis" << c << ": Requesting state " << requested_state << '\n';
-      odrive.run_state(motornum, requested_state, true);
-
-      requested_state = ODriveArduino::AXIS_STATE_ENCODER_OFFSET_CALIBRATION;
-      Serial << "Axis" << c << ": Requesting state " << requested_state << '\n';
-      odrive.run_state(motornum, requested_state, true);
-
-      requested_state = ODriveArduino::AXIS_STATE_CLOSED_LOOP_CONTROL;
-      Serial << "Axis" << c << ": Requesting state " << requested_state << '\n
-';
-      odrive.run_state(motornum, requested_state, false); // don't wait
-    } */
-
-    // Sinusoidal test move
-    if (c == 's') {
+    //Sinusoidal test move
+    char c = ' ';
+    if (Serial.available()) c = Serial.read();
+    if (c == 't') {
       Serial.println("Executing test move");
       for (float ph = 0.0f; ph < 6.28318530718f; ph += 0.01f) {
-        float pos_m0 = 50.0f * cos(ph);
-        //float pos_m1 = 20000.0f * sin(ph);
-        odrive.SetPosition(0, pos_m0);
-        //odrive.SetPosition(1, pos_m1);
-        delay(5);
+        float pos_m0 = -8.0f * sin(ph);
+        float pos_m1 = 8.0f * sin(ph);
+        odrive.SetVelocity(0, pos_m0);
+        odrive.SetVelocity(1, pos_m1);
+        delay(10);
       }
     }
+    if (c == '0' || c == '1') {
+      int num = c-'0';
 
-    // Read bus voltage
-    if (c == 'b') {
-      odrive_serial << "r vbus_voltage\n";
-      Serial << "Vbus voltage: " << odrive.readFloat() << '\n';
+      Serial << "Axis" << c << ": Requesting state " << ODriveArduino::AXIS_STATE_CLOSED_LOOP_CONTROL << '\n';
+      odrive.run_state(num, ODriveArduino::AXIS_STATE_CLOSED_LOOP_CONTROL, false); // don't wait
     }
-
-    // print motor positions in a 10s loop
-    if (c == 'p') {
-      static const unsigned long duration = 10000;
-      unsigned long start = millis();
-      while(millis() - start < duration) {
-        for (int motor = 0; motor < 2; ++motor) {
-          odrive_serial << "r axis" << motor << ".encoder.pos_estimate\n";
-          Serial << odrive.readFloat() << '\t';
-        }
-        Serial << '\n';
+    if (c == 'r' || running) {
+      if(odrive_serial.availableForWrite()) {
+        odrive.SetVelocity(0, -m1Vel);
+        odrive.SetVelocity(1, m2Vel);
       }
+      running = 1;
     }
-  }
-  //---------------------------------------
+    if (c == 's') {
+      running = 0;
+      Serial.println("Stopped.");
+    }
   // Retrieve I2C data
   IMUloop();
   RCloop();
@@ -302,38 +276,34 @@ void loop() {
     }
   }
 
-  // Set power and direction
-  unsigned int realPower1 = inRange(0, (Output1/2) + (maxPower/2) + MIN_POWER, maxPower);
-  unsigned int realPower2 = inRange(0, (Output1/2) + (maxPower/2) + MIN_POWER, maxPower);
-
   #if defined(MIN_POW_TUNING)
     int minPowTest = rcAnalogs[2] * MIN_POW_MAX / (pow(2,RC_BITS) - 1);
     m1.setPower((minPowTest) * rampLevel);
     m2.setPower((minPowTest) * rampLevel);
   #else
-    m1.setPower((realPower1) * rampLevel);
-    m2.setPower((realPower2) * rampLevel);
+    m1.setPower(Output1 * rampLevel);
+    m2.setPower(Output2 * rampLevel);
   #endif
 
-  // Drive Motors
-  //ledcWrite(CHANNEL_1, m1.getPower());
-  //ledcWrite(CHANNEL_2, m2.getPower());
+  m1Vel = inRange(-8.0f, m1.getPower()*0.00781, 8.0f);
+  m2Vel = inRange(-8.0f, m2.getPower()*0.00781, 8.0f);
+
 
   // print data every so often
   loopCycles++;
-  //printData();
+  if (running) printData();
 }
 
 void printData()
 {
-  if (loopCycles % 500 == 0)
+  if (loopCycles % 100 == 0)
   {
     // Main Loop Cycles
     // Serial.printf("c: %i, ", loopCycles);
     // Motor Data
-    Serial.printf("Pwr1: %i, ", m1.getPower());
+    Serial.printf("Pwr1: %.2f, ", m1Vel);
     //Serial.printf("Pos1: %i, PCR1: %i, ", m1.getPosition(), m1.getPCR());
-    Serial.printf("Pwr2: %i, ", m2.getPower());
+    //Serial.printf("Pwr2: %i, ", m2.getPower());
     // Serial.printf("Pos2: %i, PCR2: %.2f, ", m2.getPosition(), m2.getPCR());
     // IMU Data
     //Serial.printf("roll: %.4f, " ,ypr[2]*180/M_PI);
@@ -347,7 +317,7 @@ void printData()
     //Serial.printf("targ: %.4f, ", targetAngle);
     //Serial.printf("minPwr: %i, ", m1.getPower());
     // Serial.printf("avPos: %i, posKp: %.4f, ", averagePos, posKp);
-    //Serial.printf("thrGain: %.6f, strGain: %.6f, thr: %.4f, str: %.4f, ", throttleGain, steeringGain, throttle, steering);
+    Serial.printf("thrGain: %.6f, strGain: %.6f, thr: %.4f, str: %.4f, ", throttleGain, steeringGain, throttle, steering);
     Serial.printf("ramp: %.4f", rampLevel) ;
     // New line
     Serial.println();

@@ -41,7 +41,7 @@ void SpeedMotor::update() {
     if (t >= ZERO_SPEED_TIMEOUT) speed = 0;
 }
 
-void SpeedMotor::setPower(unsigned int pwr) {
+void SpeedMotor::setPower(int pwr) {
     power = pwr;
 }
 
@@ -49,7 +49,7 @@ void SpeedMotor::setDirection(bool dir) {
     direction = dir;
 }
 
-unsigned short int SpeedMotor::getPower() {
+int SpeedMotor::getPower() {
     return power;
 }
 
