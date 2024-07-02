@@ -12,42 +12,21 @@ extern unsigned short loopCycles;
 
 class SpeedMotor {
 public:
-    void setupPins(byte pwr_pin);
-    void setupPWM(unsigned int pwm_Freq, byte pwm_channel, byte pwm_resolution);
-    void update();
-
-    byte getSC();
-    volatile bool* getInterrupt();
-    int getPower();
+    short getPower();
     bool getDirection();
     long getPosition();
-    int getPCR();
-    bool getBrake();
     float getSpeed();
     void resetPosition();
-    void setPower(int pwr);
+    void setPower(short pwr);
     void setDirection(bool dir);
-    void setBrake(bool brk);
+    void setPosition(long pos);
+    void setSpeed(float spd);
 
 private:
-
-    byte channel;
-    byte resolution;
-    unsigned int pwmFreq;
-    byte scPin;
-    byte dirPin;
-    byte brakePin;
-    byte enable;
-    volatile bool scFlag = 0;
-    bool scState = 0;
-    int power = 0;
-    short prevPower = 0;
-    int powerChangeRate = 0;
+    short power = 0;
     bool direction = 0;
-    bool brake = 0;
     long position = 0;
     float speed = 0;
-    hw_timer_t* scTimer = timerBegin(0, 80, true);
 };
 
 #endif //SPEEDMOTOR_H

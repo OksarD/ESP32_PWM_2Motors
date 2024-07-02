@@ -10,52 +10,48 @@
 //#define DERIV_TUNING
 //#define POS_PROP_TUNING
 //#define MIN_POW_TUNING
-#define THROTTLE_TUNING
+//#define THROTTLE_TUNING
 //#define STEER_TUNING
 //#define TCR_TUNING
 
-// Macros
-// 27 ESP = 1 ODRV, 26 ESP = 2 ODRV, 25 ESP = 3 ODRV, 33 ESP = 4 ODRV
-#define PWR_PIN_1 25
-#define CHANNEL_1 0
-#define PWR_PIN_2 33
-#define CHANNEL_2 1
-
+// ODrive params
 #define ODRIVE_UART_TX 26
 #define ODRIVE_UART_RX 27
 #define ODRIVE_MAX_VELOCITY 8
+#define ODRIVE_MAX_TORQUE 12.92
 
+// Max values for tuning purposes
 #define ANGLE_MAX 4
 #define KP_MAX 300
 #define KI_MAX 1
 #define KD_MAX 10
 #define MIN_POW_MAX 50
 #define POS_KP_MAX 1
-#define TCR_MAX 0.000005
 #define THROTTLE_GAIN_MAX 0.02
 #define STEERING_GAIN_MAX 0.5
 
+// Other constants
 #define RC_BITS 10
 #define TARG_OFFSET 0
 #define RAMP_TIME 3e6
 #define PULSES_PER_REV 90
 #define WHEEL_DIAMATER 0.216
-#define MIN_POWER 1
-
+#define MIN_POWER 0.25
 
 // Globals
-unsigned int pwmFreq = 5000;
-byte pwmResolution = 10;
-unsigned short maxPower = pow(2,pwmResolution);
-float powerToVelocity = ODRIVE_MAX_VELOCITY/maxPower;
+unsigned short maxPower = 1024;
 int controlOutput;
 bool killSwitchReleased = 1;
 unsigned long rampTime = 0;
 bool rampEnabled = 0;
 float rampLevel = 0;
-float m1Vel;
-float m2Vel;
-bool running = 0;
+float m1output;
+float m2output;
+bool running = 1;
+unsigned long elapsedTime = 0;
+unsigned long prevTime = 0;
+unsigned short loopCycles = 0;
+
 // PID values
 float targetAngle = 0;
 float error = 0;
@@ -80,23 +76,14 @@ unsigned int posNum = 0;
 float throttle = 0;
 float steering = 0;
 float prevThrottle = 0;
-float throttleGain = 0;
-float steeringGain = 0.2;
-double maxTCR = 0;
-float throttleChangeRate = 0;
+float throttleGain = 0.003;
+float steeringGain = 0.15;
 float throttleOutput = 0;
 float calibrationOffset = 0;
 
 // Create encoder motor objects and map ISR array
 SpeedMotor m1;
 SpeedMotor m2;
-volatile bool* interruptArray[2] = {m1.getInterrupt(), m2.getInterrupt()};
-
-// ISR
-template <byte i>
-void IRAM_ATTR ISR() {
-  *interruptArray[i] = 1;
-}
 
 // Prototypes
 void printData();
@@ -118,16 +105,6 @@ void setup()
   Serial.begin(115200);
   Wire.setTimeOut(100);
   odrive_serial.begin(115200, SERIAL_8N1, ODRIVE_UART_RX, ODRIVE_UART_TX);
-
-  // config for motors
-  m1.setupPins(PWR_PIN_1);
-  m1.setupPWM(pwmFreq,CHANNEL_1,pwmResolution);
-  m1.setupPins(PWR_PIN_2);
-  m1.setupPWM(pwmFreq,CHANNEL_2,pwmResolution);
-
-  // encoder interrupt setup
-  attachInterrupt(digitalPinToInterrupt(m1.getSC()), ISR<0>, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(m2.getSC()), ISR<1>, CHANGE);
 
   // I2C Setup
   IMUinit();
@@ -164,19 +141,14 @@ void loop() {
         delay(10);
       }
     }
+    // set axis closed loop state for each motor.
     if (c == '0' || c == '1') {
       int num = c-'0';
 
       Serial << "Axis" << c << ": Requesting state " << ODriveArduino::AXIS_STATE_CLOSED_LOOP_CONTROL << '\n';
       odrive.run_state(num, ODriveArduino::AXIS_STATE_CLOSED_LOOP_CONTROL, false); // don't wait
     }
-    if (c == 'r' || running) {
-      if(odrive_serial.availableForWrite()) {
-        odrive.SetVelocity(0, -m1Vel);
-        odrive.SetVelocity(1, m2Vel);
-      }
-      running = 1;
-    }
+    // stop odrive commmunication
     if (c == 's') {
       running = 0;
       Serial.println("Stopped.");
@@ -211,11 +183,6 @@ void loop() {
   elapsedTime = esp_timer_get_time();
   unsigned int deltaTime = elapsedTime - prevTime;
 
-  //noInterrupts(); //set interrupts aside
-  //m1.update();
-  //m2.update();
-  //interrupts(); // resume interrupts
-
   // Throttle Control
   throttle = rcAnalogs[1] * throttleGain;
   steering = rcAnalogs[0] * steeringGain;
@@ -227,17 +194,9 @@ void loop() {
     steering = 0;
   }
 
-    // throttleChangeRate = throttle - prevThrottle;
-    // if (throttleChangeRate > maxTCR) {
-    //   throttleOutput = prevThrottle + maxTCR;
-    // } else if (throttleChangeRate < -maxTCR) {
-    //   throttleOutput = prevThrottle - maxTCR;
-    // }
-    // prevThrottle = throttle;
-
   // get target and current angle in degrees
   targetAngle = calibrationOffset + throttle; // + posProp;
-  angle = -ypr[2]*180/M_PI;
+  angle = ypr[2]*180/M_PI;
 
   // PID for motor output
   error = targetAngle - angle; // convert to degree
@@ -276,6 +235,7 @@ void loop() {
     }
   }
 
+  // Tune Minimum Power
   #if defined(MIN_POW_TUNING)
     int minPowTest = rcAnalogs[2] * MIN_POW_MAX / (pow(2,RC_BITS) - 1);
     m1.setPower((minPowTest) * rampLevel);
@@ -284,10 +244,21 @@ void loop() {
     m1.setPower(Output1 * rampLevel);
     m2.setPower(Output2 * rampLevel);
   #endif
-
-  m1Vel = inRange(-8.0f, m1.getPower()*0.00781, 8.0f);
-  m2Vel = inRange(-8.0f, m2.getPower()*0.00781, 8.0f);
-
+  
+  // Compensate for minimum power
+  if (Output1 >= 0) m1output = float(m1.getPower()*ODRIVE_MAX_TORQUE/maxPower) + MIN_POWER; // scalar is 0.01262
+  else m1output = float(m1.getPower()*ODRIVE_MAX_TORQUE/maxPower) - MIN_POWER;
+  if (Output2 >= 0) m2output = float(m2.getPower()*ODRIVE_MAX_TORQUE/maxPower) + MIN_POWER;
+  else m2output = float(m2.getPower()*ODRIVE_MAX_TORQUE/maxPower) - MIN_POWER;
+  
+  // Run when r pressed or if running paramater already set
+  if (c == 'r' || running) {
+      if(odrive_serial.availableForWrite()) {
+        odrive.SetCurrent(0, m1output);
+        odrive.SetCurrent(1, -m2output);
+      }
+      running = 1;
+  }
 
   // print data every so often
   loopCycles++;
@@ -300,26 +271,31 @@ void printData()
   {
     // Main Loop Cycles
     // Serial.printf("c: %i, ", loopCycles);
+
     // Motor Data
-    Serial.printf("Pwr1: %.2f, ", m1Vel);
-    //Serial.printf("Pos1: %i, PCR1: %i, ", m1.getPosition(), m1.getPCR());
-    //Serial.printf("Pwr2: %i, ", m2.getPower());
-    // Serial.printf("Pos2: %i, PCR2: %.2f, ", m2.getPosition(), m2.getPCR());
+    Serial.printf("Pwr1: %.2f, ", m1output);
+    // Serial.printf("Pos1: %i, ", m1.getPosition());
+    // Serial.printf("Pwr2: %i, ", m2.getPower());
+    // Serial.printf("Pos2: %i, ", m2.getPosition());
+
     // IMU Data
-    //Serial.printf("roll: %.4f, " ,ypr[2]*180/M_PI);
-    //Serial.printf("roll: %.4f, linSpd: %.4f angVel: %.4f, spd %.4f, ", ypr[2]*180/M_PI, linearWheelSpeed ,angularVelocity, speed);
+    // Serial.printf("roll: %.4f, " ,ypr[2]*180/M_PI);
+    // Serial.printf("roll: %.4f, linSpd: %.4f angVel: %.4f, spd %.4f, ", ypr[2]*180/M_PI, linearWheelSpeed ,angularVelocity, speed);
+    
     // PID Data
-    //Serial.printf("gain: %.4f, %.4f, %.4f, ", Kp, Ki, Kd);
-    Serial.printf("PID: %.4f, %.4f, %.4f, ", proportional, integral, derivative);
+    Serial.printf("gain: %.4f, %.4f, %.4f, ", Kp, Ki, Kd);
+    //Serial.printf("PID: %.4f, %.4f, %.4f, ", proportional, integral, derivative);
+    
     // RC Data
     // Serial.printf("rc: %i, %i, %i, %i, %i, %i, %i, ", rcAnalogs[0], rcAnalogs[1], rcAnalogs[2], rcAnalogs[3], ch3State, ch4State, ch7State);
+    
     // Other Data
-    //Serial.printf("targ: %.4f, ", targetAngle);
-    //Serial.printf("minPwr: %i, ", m1.getPower());
+    // Serial.printf("targ: %.4f, ", targetAngle);
+    // Serial.printf("minPwr: %i, ", m1.getPower());
     // Serial.printf("avPos: %i, posKp: %.4f, ", averagePos, posKp);
     Serial.printf("thrGain: %.6f, strGain: %.6f, thr: %.4f, str: %.4f, ", throttleGain, steeringGain, throttle, steering);
     Serial.printf("ramp: %.4f", rampLevel) ;
-    // New line
+  
     Serial.println();
   }
 }
@@ -330,4 +306,9 @@ float inRange(float min_val, float var, float max_val) {
   } else if (var > max_val) {
     return max_val;
   } else return var;
+}
+
+bool signToBool(int var) {
+  if (var < 0) return 1;
+  else return 0;
 }
