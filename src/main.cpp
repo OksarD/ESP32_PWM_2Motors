@@ -9,7 +9,6 @@
 //#define INT_TUNING
 //#define DERIV_TUNING
 //#define POS_PROP_TUNING
-//#define MIN_POW_TUNING
 //#define THROTTLE_TUNING
 //#define STEER_TUNING
 //#define TCR_TUNING
@@ -25,7 +24,6 @@
 #define KP_MAX 300
 #define KI_MAX 1
 #define KD_MAX 10
-#define MIN_POW_MAX 50
 #define POS_KP_MAX 1
 #define THROTTLE_GAIN_MAX 0.02
 #define STEERING_GAIN_MAX 0.5
@@ -119,9 +117,7 @@ void setup()
   Serial.println("ODriveArduino");
   Serial.println("Setting parameters...");
   for (int axis = 0; axis < 2; ++axis) {
-    odrive_serial << "w axis" << axis << ".controller.config.vel_limit " << 0.8f << '\n';
-    odrive_serial << "w axis" << axis << ".motor.config.current_lim " << 25.0f << '\n';
-    //odrive.run_state(axis, ODriveArduino::AXIS_STATE_CLOSED_LOOP_CONTROL, false); // don't wait
+    odrive_serial << "w axis" << axis << ".motor.config.current_lim " << 50.0f << '\n';
   }
 }
 
@@ -141,10 +137,9 @@ void loop() {
         delay(10);
       }
     }
-    // set axis closed loop state for each motor.
+    // set axis closed loop state for each motor (not needed when startup_closed_loop_control is enabled)
     if (c == '0' || c == '1') {
       int num = c-'0';
-
       Serial << "Axis" << c << ": Requesting state " << ODriveArduino::AXIS_STATE_CLOSED_LOOP_CONTROL << '\n';
       odrive.run_state(num, ODriveArduino::AXIS_STATE_CLOSED_LOOP_CONTROL, false); // don't wait
     }
@@ -164,11 +159,6 @@ void loop() {
     Ki = rcAnalogs[2] * KI_MAX / (pow(2,RC_BITS) - 1);
   #elif defined(DERIV_TUNING)
     Kd = rcAnalogs[2] * KD_MAX / (pow(2,RC_BITS) - 1);
-  #elif defined(MIN_POW_TUNING)
-    Kp = 0;
-    Ki = 0;
-    Kd = 0;
-    posKp = 0;
   #elif defined(POS_PROP_TUNING)
     posKp = rcAnalogs[2] * POS_KP_MAX / (pow(2,RC_BITS) - 1);
   #elif defined(THROTTLE_TUNING)
@@ -199,7 +189,7 @@ void loop() {
   angle = ypr[2]*180/M_PI;
 
   // PID for motor output
-  error = targetAngle - angle; // convert to degree
+  error = targetAngle - angle;
   proportional = Kp*error;
   integral += Ki*error;
   integral = inRange(-maxPower, integral, maxPower);
@@ -235,15 +225,8 @@ void loop() {
     }
   }
 
-  // Tune Minimum Power
-  #if defined(MIN_POW_TUNING)
-    int minPowTest = rcAnalogs[2] * MIN_POW_MAX / (pow(2,RC_BITS) - 1);
-    m1.setPower((minPowTest) * rampLevel);
-    m2.setPower((minPowTest) * rampLevel);
-  #else
-    m1.setPower(Output1 * rampLevel);
-    m2.setPower(Output2 * rampLevel);
-  #endif
+  m1.setPower(Output1 * rampLevel);
+  m2.setPower(Output2 * rampLevel);
   
   // Compensate for minimum power
   if (Output1 >= 0) m1output = float(m1.getPower()*ODRIVE_MAX_TORQUE/maxPower) + MIN_POWER; // scalar is 0.01262
