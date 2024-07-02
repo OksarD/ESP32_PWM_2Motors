@@ -17,8 +17,8 @@
 // ODrive params
 #define ODRIVE_UART_TX 26
 #define ODRIVE_UART_RX 27
-#define ODRIVE_MAX_VELOCITY 8
-#define ODRIVE_MAX_TORQUE 12.92
+#define ODRIVE_MAX_VELOCITY 8.0f
+#define ODRIVE_MAX_TORQUE 12.92f
 
 // Max values for tuning purposes
 #define ANGLE_MAX 4
@@ -36,7 +36,7 @@
 #define RAMP_TIME 3e6
 #define PULSES_PER_REV 90
 #define WHEEL_DIAMATER 0.216
-#define MIN_POWER 0.25
+#define MIN_POWER 0.25f
 
 // Globals
 unsigned short maxPower = 1024;
@@ -128,14 +128,14 @@ void setup()
 // Main Loop
 void loop() {
 
-    //Sinusoidal test move
+    //Sinusoidal test move (only while in velocity control)
     char c = ' ';
     if (Serial.available()) c = Serial.read();
     if (c == 't') {
       Serial.println("Executing test move");
       for (float ph = 0.0f; ph < 6.28318530718f; ph += 0.01f) {
-        float pos_m0 = -8.0f * sin(ph);
-        float pos_m1 = 8.0f * sin(ph);
+        float pos_m0 = -ODRIVE_MAX_VELOCITY * sin(ph);
+        float pos_m1 = ODRIVE_MAX_VELOCITY * sin(ph);
         odrive.SetVelocity(0, pos_m0);
         odrive.SetVelocity(1, pos_m1);
         delay(10);
@@ -187,7 +187,7 @@ void loop() {
   throttle = rcAnalogs[1] * throttleGain;
   steering = rcAnalogs[0] * steeringGain;
 
-  // middle switch states
+  // middle switch for calibrating angle
   if (ch7State == 0) {
     calibrationOffset = (rcAnalogs[3] - 512) * ANGLE_MAX / (pow(2,RC_BITS) - 1);
     throttle = 0;
