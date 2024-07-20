@@ -1,6 +1,6 @@
 #include "SpeedMotor.h"
 
-void SpeedMotor::setPower(short pwr) {
+void SpeedMotor::setPower(float pwr) {
     power = pwr;
 }
 void SpeedMotor::setDirection(bool dir) {
@@ -12,7 +12,7 @@ void SpeedMotor::setPosition(long pos) {
 void SpeedMotor::setSpeed(float spd) {
     speed = spd;
 }
-short SpeedMotor::getPower() {
+float SpeedMotor::getPower() {
     return power;
 }
 long SpeedMotor::getPosition() {

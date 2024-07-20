@@ -11,7 +11,6 @@
 //#define POS_PROP_TUNING
 //#define THROTTLE_TUNING
 //#define STEER_TUNING
-//#define TCR_TUNING
 
 // ODrive params
 #define ODRIVE_UART_TX 26
@@ -33,8 +32,8 @@
 #define TARG_OFFSET 0
 #define RAMP_TIME 3e6
 #define PULSES_PER_REV 90
-#define WHEEL_DIAMATER 0.216
-#define MIN_POWER 0.25f
+#define WHEEL_DIAMATER 0.345
+#define MIN_POWER 0.45f
 
 // Globals
 unsigned short maxPower = 1024;
@@ -163,8 +162,6 @@ void loop() {
     posKp = rcAnalogs[2] * POS_KP_MAX / (pow(2,RC_BITS) - 1);
   #elif defined(THROTTLE_TUNING)
     throttleGain = rcAnalogs[2] * THROTTLE_GAIN_MAX / (pow(2,RC_BITS) - 1);
-  #elif defined(TCR_TUNING)
-    maxTCR = rcAnalogs[2] * TCR_MAX / (pow(2,RC_BITS) - 1);
   #elif defined(STEER_TUNING)
     steeringGain = rcAnalogs[2] * STEERING_GAIN_MAX / (pow(2,RC_BITS) - 1);
   #endif
@@ -224,21 +221,22 @@ void loop() {
       else rampLevel = (elapsedTime - rampTime)/ RAMP_TIME;
     }
   }
-
-  m1.setPower(Output1 * rampLevel);
-  m2.setPower(Output2 * rampLevel);
   
+  m1.setPower(Output1);
+  m2.setPower(Output2);
+
   // Compensate for minimum power
-  if (Output1 >= 0) m1output = float(m1.getPower()*ODRIVE_MAX_TORQUE/maxPower) + MIN_POWER; // scalar is 0.01262
+  if (Output1 >= 0) m1output = (m1.getPower()*ODRIVE_MAX_TORQUE/maxPower) + MIN_POWER; // scalar is 0.01262
   else m1output = float(m1.getPower()*ODRIVE_MAX_TORQUE/maxPower) - MIN_POWER;
   if (Output2 >= 0) m2output = float(m2.getPower()*ODRIVE_MAX_TORQUE/maxPower) + MIN_POWER;
   else m2output = float(m2.getPower()*ODRIVE_MAX_TORQUE/maxPower) - MIN_POWER;
   
+
   // Run when r pressed or if running paramater already set
   if (c == 'r' || running) {
       if(odrive_serial.availableForWrite()) {
-        odrive.SetCurrent(0, m1output);
-        odrive.SetCurrent(1, -m2output);
+        odrive.SetCurrent(0, m1output* rampLevel);
+        odrive.SetCurrent(1, -m2output* rampLevel);
       }
       running = 1;
   }
@@ -256,9 +254,9 @@ void printData()
     // Serial.printf("c: %i, ", loopCycles);
 
     // Motor Data
-    Serial.printf("Pwr1: %.2f, ", m1output);
+    Serial.printf("Pwr1: %.2f, Out1: %.2f ", m1.getPower(), m1output*rampLevel);
     // Serial.printf("Pos1: %i, ", m1.getPosition());
-    // Serial.printf("Pwr2: %i, ", m2.getPower());
+    //Serial.printf("Pwr2: %.2f, Out2: %.2f ", m2.getPower(), m2output*rampLevel);
     // Serial.printf("Pos2: %i, ", m2.getPosition());
 
     // IMU Data

@@ -12,18 +12,18 @@ extern unsigned short loopCycles;
 
 class SpeedMotor {
 public:
-    short getPower();
+    float getPower();
     bool getDirection();
     long getPosition();
     float getSpeed();
     void resetPosition();
-    void setPower(short pwr);
+    void setPower(float pwr);
     void setDirection(bool dir);
     void setPosition(long pos);
     void setSpeed(float spd);
 
 private:
-    short power = 0;
+    float power = 0;
     bool direction = 0;
     long position = 0;
     float speed = 0;
