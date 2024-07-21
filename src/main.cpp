@@ -196,8 +196,8 @@ void loop() {
     prevError = error;
   } 
   controlOutput = proportional + integral + derivative;
-  short Output1 = controlOutput + steering;
-  short Output2 = controlOutput - steering;
+  m1.setPower(controlOutput + steering);
+  m2.setPower(controlOutput - steering);
 
   // Kill Switch and Power Ramp Up Logic
   if(ch3State) {
@@ -221,14 +221,11 @@ void loop() {
       else rampLevel = (elapsedTime - rampTime)/ RAMP_TIME;
     }
   }
-  
-  m1.setPower(Output1);
-  m2.setPower(Output2);
 
   // Compensate for minimum power
-  if (Output1 >= 0) m1output = (m1.getPower()*ODRIVE_MAX_TORQUE/maxPower) + MIN_POWER; // scalar is 0.01262
+  if (m1.getPower() >= 0) m1output = (m1.getPower()*ODRIVE_MAX_TORQUE/maxPower) + MIN_POWER; // scalar is 0.01262
   else m1output = float(m1.getPower()*ODRIVE_MAX_TORQUE/maxPower) - MIN_POWER;
-  if (Output2 >= 0) m2output = float(m2.getPower()*ODRIVE_MAX_TORQUE/maxPower) + MIN_POWER;
+  if (m2.getPower() >= 0) m2output = float(m2.getPower()*ODRIVE_MAX_TORQUE/maxPower) + MIN_POWER;
   else m2output = float(m2.getPower()*ODRIVE_MAX_TORQUE/maxPower) - MIN_POWER;
   
 
