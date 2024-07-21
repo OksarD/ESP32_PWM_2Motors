@@ -5,7 +5,7 @@
 //#include <SoftwareSerial.h>
 //#include <HardwareSerial.h>
 
-//#define PROP_TUNING
+#define PROP_TUNING
 //#define INT_TUNING
 //#define DERIV_TUNING
 //#define POS_PROP_TUNING
@@ -33,7 +33,8 @@
 #define RAMP_TIME 3e6
 #define PULSES_PER_REV 90
 #define WHEEL_DIAMATER 0.345
-#define MIN_POWER 0.45f
+#define MIN_POWER_1 0.3f
+#define MIN_POWER_2 0.25f
 
 // Globals
 unsigned short maxPower = 1024;
@@ -59,8 +60,8 @@ float proportional = 0;
 float integral = 0;
 float derivative = 0;
 float Kp = 50;
-float Ki = 0.11;
-float Kd = 0.45;
+float Ki = 0;//0.11;
+float Kd = 0;//0.45;
 float posKp = 0;
 
 // P algorithm for speed to determine target angle
@@ -223,10 +224,10 @@ void loop() {
   }
 
   // Compensate for minimum power
-  if (m1.getPower() >= 0) m1output = (m1.getPower()*ODRIVE_MAX_TORQUE/maxPower) + MIN_POWER; // scalar is 0.01262
-  else m1output = float(m1.getPower()*ODRIVE_MAX_TORQUE/maxPower) - MIN_POWER;
-  if (m2.getPower() >= 0) m2output = float(m2.getPower()*ODRIVE_MAX_TORQUE/maxPower) + MIN_POWER;
-  else m2output = float(m2.getPower()*ODRIVE_MAX_TORQUE/maxPower) - MIN_POWER;
+  if (m1.getPower() >= 0) m1output = (m1.getPower()*ODRIVE_MAX_TORQUE/maxPower) + MIN_POWER_1; // scalar is 0.01262
+  else m1output = float(m1.getPower()*ODRIVE_MAX_TORQUE/maxPower) - MIN_POWER_1;
+  if (m2.getPower() >= 0) m2output = float(m2.getPower()*ODRIVE_MAX_TORQUE/maxPower) + MIN_POWER_2;
+  else m2output = float(m2.getPower()*ODRIVE_MAX_TORQUE/maxPower) - MIN_POWER_2;
   
 
   // Run when r pressed or if running paramater already set
