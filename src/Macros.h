@@ -4,6 +4,8 @@
 //#include <SoftwareSerial.h>
 //#include <HardwareSerial.h>
 
+#define LED_PIN 2
+
 //#define PROP_TUNING
 //#define INT_TUNING
 //#define DERIV_TUNING
@@ -11,11 +13,13 @@
 //#define THROTTLE_TUNING
 //#define STEER_TUNING
 //#define ENABLE_MOTOR_CALIBRATION
+#define STEER_PROP_TUNING
+//#define STEER_INT_TUNING
 
 // ODrive params
 #define ODRIVE_UART_TX 26
 #define ODRIVE_UART_RX 27
-#define ODRIVE_MAX_VELOCITY 8.0f
+#define ODRIVE_MAX_VELOCITY 7.6f
 #define ODRIVE_MAX_TORQUE 12.92f
 
 // Max values for tuning purposes
@@ -25,7 +29,8 @@
 #define KD_MAX 10
 #define POS_KP_MAX 1
 #define THROTTLE_GAIN_MAX 0.02
-#define STEERING_GAIN_MAX 0.5
+#define STEER_KP_MAX 100
+#define STEER_KI_MAX 0.5
 
 // Other constants
 #define RC_BITS 10

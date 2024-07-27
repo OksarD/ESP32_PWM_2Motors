@@ -6,9 +6,6 @@ MPU6050 mpu;
 //#define OUTPUT_READABLE_REALACCEL
 
 #define INTERRUPT_PIN 23 
-#define LED_PIN 2
-
-bool blinkState = false;
 
 // orientation/motion vars
 Quaternion q;           // [w, x, y, z]         quaternion container
@@ -74,7 +71,6 @@ void IMUinit() {
         Serial.print(devStatus);
         Serial.println(F(")"));
     }
-    pinMode(LED_PIN, OUTPUT);
 }
 
 void IMUloop() {
@@ -96,9 +92,6 @@ void IMUloop() {
             mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
         #endif
         Wire.flush();
-        // blink LED to indicate activity
-        blinkState = !blinkState;
-        digitalWrite(LED_PIN, blinkState);
     }
     } else {
         //Serial.print("No IMU data!");
@@ -107,7 +100,7 @@ void IMUloop() {
 }
 
 void RCinit() {
-    pinMode(LED_PIN, OUTPUT);
+    ;
 }
 
 void RCloop() {
@@ -121,8 +114,6 @@ void RCloop() {
         ch3State = rcBuffer[8] & 0b0001;
         ch4State = (rcBuffer[8] & 0b0010) >> 1;
         ch7State = rcBuffer[8] >> 2;
-        blinkState = !blinkState;
-        digitalWrite(LED_PIN, blinkState);
     }
     Wire.flush();
 }

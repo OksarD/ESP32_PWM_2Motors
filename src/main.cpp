@@ -6,6 +6,7 @@
 #include <Macros.h>
 
 // Globals
+bool blinkState = false;
 int controlOutput;
 bool killSwitchReleased = 1;
 unsigned long rampTime = 0;
@@ -19,7 +20,7 @@ unsigned long prevTime = 0;
 unsigned short loopCycles = 0;
 bool motor_calib_state = 0;
 
-// PID values
+// PID Balance values
 float targetAngle = 0;
 float error = 0;
 float prevError = 0;
@@ -29,15 +30,24 @@ float proportional = 0;
 float integral = 0;
 float derivative = 0;
 float Kp = 38; 
-float Ki = 0.16;
-float Kd = 6;
+float Ki = 0.12;
+float Kd = 5;
+
+// PI steering values
+float speedDiff = 0;
+float steeringError = 0;
+float steerKp = 0;
+float steerKi = 0;
+float steerOutput = 0;
+float steerProportional = 0;
+float steerIntegral = 0;
 
 // RC control vars
 float throttle = 0;
 float steering = 0;
 float prevThrottle = 0;
 float throttleGain = 0.006;
-float steeringGain = 0.15;
+float steeringGain = 0.5;
 float throttleOutput = 0;
 float calibrationOffset = 0;
 
@@ -81,6 +91,8 @@ void setup()
   for (int axis = 0; axis < 2; ++axis) {
     odrive_serial << "w axis" << axis << ".motor.config.current_lim " << 50.0f << '\n';
   }
+
+  pinMode(LED_PIN, OUTPUT);
 }
 
 // Main Loop
@@ -101,8 +113,10 @@ void loop() {
     posKp = rcAnalogs[2] * POS_KP_MAX / (pow(2,RC_BITS) - 1);
   #elif defined(THROTTLE_TUNING)
     throttleGain = rcAnalogs[2] * THROTTLE_GAIN_MAX / (pow(2,RC_BITS) - 1);
-  #elif defined(STEER_TUNING)
-    steeringGain = rcAnalogs[2] * STEERING_GAIN_MAX / (pow(2,RC_BITS) - 1);
+  #elif defined(STEER_PROP_TUNING)
+    steerKp = rcAnalogs[2] * STEER_KP_MAX / (pow(2,RC_BITS) - 1);
+  #elif defined(STEER_INT_TUNING)
+    steerKi = rcAnalogs[2] * STEER_INT_MAX / (pow(2,RC_BITS) - 1);
   #endif
 
   // read encoders and update position
@@ -110,7 +124,7 @@ void loop() {
 
   // Throttle Control
   throttle = rcAnalogs[1] * throttleGain;
-  steering = rcAnalogs[0] * steeringGain;
+  steering = rcAnalogs[0] * 1*ODRIVE_MAX_VELOCITY / MAX_POWER;
 
   // switch CH7 left for angle tuning, left for motor calibration, middle for operation
   if (ch7State == 0) {
@@ -142,10 +156,27 @@ void loop() {
   // get target and current angle in degrees
   targetAngle = calibrationOffset + throttle; // + posProp;
   angle = ypr[2]*180/M_PI;
+  // get motor speeds
+  
+  if (loopCycles % 20 == 0) {
+    odrive_serial << "r axis0.encoder.vel_estimate\n";
+    m1.setSpeed(odrive.readFloat());
+  } else if ((loopCycles + 10) % 20 == 0) {
+    odrive_serial << "r axis1.encoder.vel_estimate\n";
+    m2.setSpeed(-odrive.readFloat());
+  }
+  
+  // PI algorithm to control steering
+  speedDiff = -m2.getSpeed() + m1.getSpeed();
+  steeringError = steering - speedDiff;
+  steerProportional = steerKp*steeringError;
+  steerIntegral += steerKi*steeringError;
+  steerIntegral = inRange(-MAX_POWER, steerIntegral, MAX_POWER);
+  steerOutput = steerProportional + steerIntegral;
 
   BalanceLoop();
-  m1.setPower(controlOutput + steering);
-  m2.setPower(controlOutput - steering);
+  m1.setPower(controlOutput + steerOutput);
+  m2.setPower(controlOutput - steerOutput);
 
   // Kill Switch and Power Ramp Up Logic
   if(ch3State) {
@@ -207,6 +238,10 @@ void loop() {
   // print data every so often
   loopCycles++;
   if (running) printData();
+
+  // blink LED to indicate activity
+  blinkState = !blinkState;
+  digitalWrite(LED_PIN, blinkState);
 }
 
 void printData()
@@ -218,17 +253,19 @@ void printData()
 
     // Motor Data
     Serial.printf("Pwr1: %.2f, Out1: %.2f ", m1.getPower(), m1output*rampLevel);
-    // Serial.printf("Pos1: %i, ", m1.getPosition());
+    Serial.printf("Spd1: %.2f, ", m1.getSpeed());
     //Serial.printf("Pwr2: %.2f, Out2: %.2f ", m2.getPower(), m2output*rampLevel);
-    // Serial.printf("Pos2: %i, ", m2.getPosition());
-
+    // Serial.printf("Spd2: %.2f, ", m2.getSpeed());
+    Serial.printf("Diff: %.2f, ", speedDiff);
     // IMU Data
-    Serial.printf("roll: %.4f, trim: %.2f" ,ypr[2]*180/M_PI, calibrationOffset);
+    //Serial.printf("roll: %.4f, trim: %.2f" ,ypr[2]*180/M_PI, calibrationOffset);
     
     // PID Data
     //Serial.printf("gain: %.4f, %.4f, %.4f, ", Kp, Ki, Kd);
     //Serial.printf("PID: %.4f, %.4f, %.4f, ", proportional, integral, derivative);
-    
+    Serial.printf("StrGain: %.2f, %.2f, ", steerKp, steerKi);
+    Serial.printf("StrPI: %.2f, %.2f, ", steerProportional, steerIntegral);
+    Serial.printf("StrErr: %.2f, ", steeringError);
     // RC Data
     // Serial.printf("rc: %i, %i, %i, %i, %i, %i, %i, ", rcAnalogs[0], rcAnalogs[1], rcAnalogs[2], rcAnalogs[3], ch3State, ch4State, ch7State);
     
@@ -236,7 +273,8 @@ void printData()
     // Serial.printf("targ: %.4f, ", targetAngle);
     // Serial.printf("minPwr: %i, ", m1.getPower());
     // Serial.printf("avPos: %i, posKp: %.4f, ", averagePos, posKp);
-    //Serial.printf("thrGain: %.6f, strGain: %.6f, thr: %.4f, str: %.4f, ", throttleGain, steeringGain, throttle, steering);
+    //Serial.printf("thrGain: %.6f, strGain: %.6f, ", throttleGain, steeringGain);
+    Serial.printf("thr: %.4f, str: %.4f, ", throttle, steering);
     //Serial.printf("ramp: %.4f", rampLevel) ;
   
     Serial.println();
