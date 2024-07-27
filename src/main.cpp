@@ -5,12 +5,13 @@
 //#include <SoftwareSerial.h>
 //#include <HardwareSerial.h>
 
-#define PROP_TUNING
+//#define PROP_TUNING
 //#define INT_TUNING
 //#define DERIV_TUNING
 //#define POS_PROP_TUNING
 //#define THROTTLE_TUNING
 //#define STEER_TUNING
+//#define ENABLE_MOTOR_CALIBRATION
 
 // ODrive params
 #define ODRIVE_UART_TX 26
@@ -33,8 +34,8 @@
 #define RAMP_TIME 3e6
 #define PULSES_PER_REV 90
 #define WHEEL_DIAMATER 0.345
-#define MIN_POWER_1 0.3f
-#define MIN_POWER_2 0.25f
+#define MIN_POWER_1 0.32f
+#define MIN_POWER_2 0.24f
 
 // Globals
 unsigned short maxPower = 1024;
@@ -49,6 +50,7 @@ bool running = 1;
 unsigned long elapsedTime = 0;
 unsigned long prevTime = 0;
 unsigned short loopCycles = 0;
+bool motor_calib_state = 0;
 
 // PID values
 float targetAngle = 0;
@@ -59,9 +61,9 @@ float prevAngle;
 float proportional = 0;
 float integral = 0;
 float derivative = 0;
-float Kp = 50;
-float Ki = 0;//0.11;
-float Kd = 0;//0.45;
+float Kp = 38; 
+float Ki = 0.16;
+float Kd = 6;
 float posKp = 0;
 
 // P algorithm for speed to determine target angle
@@ -74,11 +76,10 @@ unsigned int posNum = 0;
 float throttle = 0;
 float steering = 0;
 float prevThrottle = 0;
-float throttleGain = 0.003;
+float throttleGain = 0.006;
 float steeringGain = 0.15;
 float throttleOutput = 0;
 float calibrationOffset = 0;
-
 // Create encoder motor objects and map ISR array
 SpeedMotor m1;
 SpeedMotor m2;
@@ -137,12 +138,6 @@ void loop() {
         delay(10);
       }
     }
-    // set axis closed loop state for each motor (not needed when startup_closed_loop_control is enabled)
-    if (c == '0' || c == '1') {
-      int num = c-'0';
-      Serial << "Axis" << c << ": Requesting state " << ODriveArduino::AXIS_STATE_CLOSED_LOOP_CONTROL << '\n';
-      odrive.run_state(num, ODriveArduino::AXIS_STATE_CLOSED_LOOP_CONTROL, false); // don't wait
-    }
     // stop odrive commmunication
     if (c == 's') {
       running = 0;
@@ -175,13 +170,33 @@ void loop() {
   throttle = rcAnalogs[1] * throttleGain;
   steering = rcAnalogs[0] * steeringGain;
 
-  // middle switch for calibrating angle
+  // switch CH7 left for angle tuning, left for motor calibration, middle for operation
   if (ch7State == 0) {
     calibrationOffset = (rcAnalogs[3] - 512) * ANGLE_MAX / (pow(2,RC_BITS) - 1);
     throttle = 0;
     steering = 0;
+  } 
+  #if defined(ENABLE_MOTOR_CALIBRATION) 
+  if (ch7State == 2) {
+    if (!motor_calib_state) {
+      motor_calib_state = 1;
+      for (int num = 0; num < 2; num++) {
+        Serial.printf("Calibrating motor %i...\n", num);
+        odrive.run_state(num, ODriveArduino::AXIS_STATE_MOTOR_CALIBRATION, false); // don't wait
+        delay(5000);
+        odrive.run_state(num, ODriveArduino::AXIS_STATE_ENCODER_OFFSET_CALIBRATION, false); // don't wait
+        delay(5000);
+      }
+      delay(22000);
+      Serial.println("Done motor calibration.");
+      odrive.run_state(0, ODriveArduino::AXIS_STATE_CLOSED_LOOP_CONTROL, false); // don't wait
+      odrive.run_state(1, ODriveArduino::AXIS_STATE_CLOSED_LOOP_CONTROL, false); // don't wait
+    }
+  } else if {
+    motor_calib_state = 0
   }
-
+  #endif
+  
   // get target and current angle in degrees
   targetAngle = calibrationOffset + throttle; // + posProp;
   angle = ypr[2]*180/M_PI;
@@ -233,8 +248,8 @@ void loop() {
   // Run when r pressed or if running paramater already set
   if (c == 'r' || running) {
       if(odrive_serial.availableForWrite()) {
-        odrive.SetCurrent(0, m1output* rampLevel);
         odrive.SetCurrent(1, -m2output* rampLevel);
+        odrive.SetCurrent(0, m1output* rampLevel);
       }
       running = 1;
   }
