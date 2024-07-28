@@ -1,7 +1,7 @@
 #include "Control.h"
 #include <Project.h>
 
-void BalanceLoop() {
+void BalanceController() {
   // PID for balancing
   unsigned int deltaTime = elapsedTime - prevTime;
 
@@ -17,9 +17,9 @@ void BalanceLoop() {
   controlOutput = proportional + integral + derivative;
 }
 
-void SteeringLoop() {
+void SteeringController() {
   // PI algorithm to control steering
-  speedDiff = -m2.getSpeed() + m1.getSpeed();
+  speedDiff = -m2.speed + m1.speed;
   steeringError = steering - speedDiff;
   steerProportional = steerKp*steeringError;
   steerIntegral += steerKi*steeringError;

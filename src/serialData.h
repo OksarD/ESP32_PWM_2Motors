@@ -1,15 +1,17 @@
-#ifndef READI2C_H
-#define READI2C_H
+#ifndef SERIALDATA_H
+#define SERIALDATA_H
 
 #include <Arduino.h>
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 #include <Wire.h>
+#include <Project.h>
 
 void IMUinit();
-void IMUloop();
-void RCinit();
-void RCloop();
+void readIMUdata();
+void readRCdata();
+void readMotorSpeed(encoderMotor motor_object);
+void writeMotorOutputsTask(void *paramaters);
 
 extern Quaternion q;           // [w, x, y, z]         quaternion container
 extern VectorInt16 aa;         // [x, y, z]            accel sensor measurements
@@ -21,4 +23,4 @@ extern bool ch3State;
 extern bool ch4State;
 extern byte ch7State;
 
-#endif //READI2C_H
+#endif //SERIALDATA_H

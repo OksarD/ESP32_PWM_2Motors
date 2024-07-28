@@ -1,11 +1,11 @@
-#include "ReadI2C.h"
+#include "serialData.h"
 
 MPU6050 mpu;
 
 #define OUTPUT_READABLE_YAWPITCHROLL
 //#define OUTPUT_READABLE_REALACCEL
 
-#define INTERRUPT_PIN 23 
+#define INTERRUPT_PIN_I2C 23 
 
 // orientation/motion vars
 Quaternion q;           // [w, x, y, z]         quaternion container
@@ -26,22 +26,22 @@ uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
 uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 uint8_t rcBuffer[9];   // RC storage buffer
-bool IMUdataFlag = 0;
+bool I2CdataFlag = 0;
 
 void IRAM_ATTR IMU_ISR() {
-    IMUdataFlag = 1;
+    I2CdataFlag = 1;
 }
 
 void IMUinit() {
     mpu.initialize();
-    pinMode(INTERRUPT_PIN, INPUT);
+    pinMode(INTERRUPT_PIN_I2C, INPUT);
     // verify connection
     Serial.println(F("Testing device connections..."));
     Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
     // load and configure the DMP
     Serial.println(F("Initializing DMP..."));
     devStatus = mpu.dmpInitialize();
-    attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), IMU_ISR, RISING);
+    attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN_I2C), IMU_ISR, RISING);
     // supply your own gyro offsets here, scaled for min sensitivity
     mpu.setXGyroOffset(83);
     mpu.setYGyroOffset(-71);
@@ -73,12 +73,12 @@ void IMUinit() {
     }
 }
 
-void IMUloop() {
+void readIMUdata() {
         // if programming failed, don't try to do anything
         if (!dmpReady) return;
         // read a packet from FIFO
-        if (IMUdataFlag) {
-            IMUdataFlag = 0;
+        if (I2CdataFlag) {
+            I2CdataFlag = 0;
             if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
 
             #ifdef OUTPUT_READABLE_YAWPITCHROLL
@@ -98,7 +98,7 @@ void IMUloop() {
         }
 }
 
-void RCloop() {
+void readRCdata() {
     Wire.flush();
     Wire.requestFrom(0x60, 9);
     if(Wire.available()) {
@@ -113,3 +113,39 @@ void RCloop() {
     Wire.flush();
 }
 
+void readMotorSpeed(encoderMotor motor_object) {
+    odrive_serial << "r axis" << motor_object.axis << ".encoder.vel_estimate\n";
+    motor_object.speed = odrive.readFloat();
+}
+
+void writeMotorOutputsTask(void *paramaters) {
+    for(;;) {
+        char c = ' ';
+        if (Serial.available()) c = Serial.read();
+        // Run when r pressed or if running paramater already set
+        if (c == 'r' || running) {
+            if(odrive_serial.availableForWrite()) {
+                odrive.SetCurrent(m2.axis, -m2output* rampLevel);
+                odrive.SetCurrent(m1.axis, m1output* rampLevel);
+            }
+            running = 1;
+        }
+        // Sinusoidal test move (only while in velocity control)
+        if (c == 't') {
+            Serial.println("Executing test move");
+            for (float ph = 0.0f; ph < 6.28318530718f; ph += 0.01f) {
+            float pos_m0 = -ODRIVE_MAX_VELOCITY * sin(ph);
+            float pos_m1 = ODRIVE_MAX_VELOCITY * sin(ph);
+            odrive.SetVelocity(0, pos_m0);
+            odrive.SetVelocity(1, pos_m1);
+            delay(10);
+            }
+        }
+        // stop odrive commmunication
+        if (c == 's') {
+            running = 0;
+            Serial.println("Stopped.");
+        }
+        vTaskSuspend(NULL);
+    }
+}
