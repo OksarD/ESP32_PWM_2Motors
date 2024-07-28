@@ -18,6 +18,16 @@ extern float prevError;
 extern unsigned long elapsedTime;
 extern unsigned long prevTime;
 extern int controlOutput;
+extern float speedDiff;
+extern encoderMotor m1;
+extern encoderMotor m2;
+extern float steeringError;
+extern float steering;
+extern float steerProportional;
+extern float steerKp;
+extern float steerKi;
+extern float steerIntegral;
+extern float steerOutput;
 
 extern float inRange(float min_val, float var, float max_val);
 

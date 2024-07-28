@@ -1,5 +1,5 @@
 #include "Control.h"
-#include <Macros.h>
+#include <Project.h>
 
 void BalanceLoop() {
   // PID for balancing
@@ -15,4 +15,14 @@ void BalanceLoop() {
     prevError = error;
   } 
   controlOutput = proportional + integral + derivative;
+}
+
+void SteeringLoop() {
+  // PI algorithm to control steering
+  speedDiff = -m2.getSpeed() + m1.getSpeed();
+  steeringError = steering - speedDiff;
+  steerProportional = steerKp*steeringError;
+  steerIntegral += steerKi*steeringError;
+  steerIntegral = inRange(-MAX_POWER, steerIntegral, MAX_POWER);
+  steerOutput = steerProportional + steerIntegral;
 }

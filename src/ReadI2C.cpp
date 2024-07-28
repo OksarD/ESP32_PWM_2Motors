@@ -74,33 +74,28 @@ void IMUinit() {
 }
 
 void IMUloop() {
-    // if programming failed, don't try to do anything
-    if (!dmpReady) return;
-    // read a packet from FIFO
-    if (IMUdataFlag) {
-        IMUdataFlag = 0;
-        if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
+        // if programming failed, don't try to do anything
+        if (!dmpReady) return;
+        // read a packet from FIFO
+        if (IMUdataFlag) {
+            IMUdataFlag = 0;
+            if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
 
-        #ifdef OUTPUT_READABLE_YAWPITCHROLL
-            // display Euler angles in degrees
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            mpu.dmpGetGravity(&gravity, &q);
-            mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-        #endif
-        #ifdef OUTPUT_READABLE_REALACCEL
-            mpu.dmpGetAccel(&aa, fifoBuffer);
-            mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
-        #endif
-        Wire.flush();
-    }
-    } else {
-        //Serial.print("No IMU data!");
-    }
-    
-}
-
-void RCinit() {
-    ;
+            #ifdef OUTPUT_READABLE_YAWPITCHROLL
+                // display Euler angles in degrees
+                mpu.dmpGetQuaternion(&q, fifoBuffer);
+                mpu.dmpGetGravity(&gravity, &q);
+                mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+            #endif
+            #ifdef OUTPUT_READABLE_REALACCEL
+                mpu.dmpGetAccel(&aa, fifoBuffer);
+                mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
+            #endif
+            Wire.flush();
+        }
+        } else {
+            //Serial.print("No IMU data!");
+        }
 }
 
 void RCloop() {

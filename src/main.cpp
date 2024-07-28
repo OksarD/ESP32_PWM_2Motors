@@ -1,9 +1,8 @@
 #include <Arduino.h>
-#include <SpeedMotor.h>
 #include <ReadI2C.h>
 #include "ODriveArduino.h"
 #include <Control.h>
-#include <Macros.h>
+#include <Project.h>
 
 // Globals
 bool blinkState = false;
@@ -51,9 +50,9 @@ float steeringGain = 0.5;
 float throttleOutput = 0;
 float calibrationOffset = 0;
 
-// Create encoder motor objects and map ISR array
-SpeedMotor m1;
-SpeedMotor m2;
+// Create encoder motor objects
+encoderMotor m1;
+encoderMotor m2;
 
 // Prototypes
 void printData();
@@ -67,6 +66,10 @@ template<>        inline Print& operator <<(Print &obj, float arg) { obj.print(a
 HardwareSerial odrive_serial(Serial1);
 ODriveArduino odrive(odrive_serial);
 
+// Task handles
+TaskHandle_t Core1Tasks_h;
+TaskHandle_t Core0Tasks_h;
+
 // Main Setup
 void setup()
 {
@@ -79,6 +82,7 @@ void setup()
   // I2C Setup
   IMUinit();
   RCinit();
+  //xTaskCreatePinnedToCore(Core0Tasks, "Core0Tasks", 10000, NULL, 1, &Core0Tasks_h, 0);
   Serial.println(F("Initializing I2C devices..."));
   while (!Serial);
   Serial.println("Serial Ready...");
@@ -165,15 +169,8 @@ void loop() {
     odrive_serial << "r axis1.encoder.vel_estimate\n";
     m2.setSpeed(-odrive.readFloat());
   }
-  
-  // PI algorithm to control steering
-  speedDiff = -m2.getSpeed() + m1.getSpeed();
-  steeringError = steering - speedDiff;
-  steerProportional = steerKp*steeringError;
-  steerIntegral += steerKi*steeringError;
-  steerIntegral = inRange(-MAX_POWER, steerIntegral, MAX_POWER);
-  steerOutput = steerProportional + steerIntegral;
 
+  SteeringLoop();
   BalanceLoop();
   m1.setPower(controlOutput + steerOutput);
   m2.setPower(controlOutput - steerOutput);

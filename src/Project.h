@@ -1,8 +1,5 @@
-#ifndef MACROS_H
-#define MACROS_H
-
-//#include <SoftwareSerial.h>
-//#include <HardwareSerial.h>
+#ifndef PROJECT_H
+#define PROJECT_H
 
 #define LED_PIN 2
 
@@ -42,4 +39,12 @@
 #define MIN_POWER_2 0.24f
 #define MAX_POWER 1024.0f
 
-#endif //MACROS_H
+// Globals
+struct encoderMotor {
+    float power = 0;
+    long position = 0;
+    float speed = 0;
+};
+
+
+#endif //PROJECT_H
